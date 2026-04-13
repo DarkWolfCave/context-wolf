@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*.bak
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+~/.context/
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/Temp
+test_*.db
+tmp/
+temp/
+.pytest_cache/
+
+# Build artifacts
+dist/
+build/
+
+# Gemini
+.gemini-clipboard/
+
+# Environment / Secrets
+.env
+*.env
+!.env.example
+
+# Embedding model (large binary)
+embedding_worker/model/
+
+# Dump files
+*.dump
+
+# Claude Code local settings
+.claude/
+.claude.md
+
+# Private/local files (not part of distribution)
+local/
+docs_private/
+config/cm_keywords.json
+config/.security-scan-report.json
+.security-scan-report.json

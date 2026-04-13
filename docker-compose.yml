@@ -1,0 +1,46 @@
+# ContextWolf - PostgreSQL Quick Start
+#
+# Usage:
+#   docker compose up -d        # Start PostgreSQL with pgvector
+#   docker compose down          # Stop (data persists in volume)
+#   docker compose down -v       # Stop and DELETE all data
+#
+# After starting, run: cm init (or configure manually)
+
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:494dff7e67e7bc2c826b94c331364978d145ebb86fd338154138b084223b7f67
+    container_name: cm-postgres
+    restart: unless-stopped
+    ports:
+      # Localhost only - access from this machine only (secure default).
+      # For remote access (e.g., DB on Raspberry Pi, app on Mac),
+      # change to "5432:5432" or "192.168.x.x:5432:5432"
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: context_manager
+      POSTGRES_USER: cm_user
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - cm_data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+      - /run/postgresql:noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - FOWNER
+      - DAC_READ_SEARCH
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cm_user -d context_manager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cm_data:

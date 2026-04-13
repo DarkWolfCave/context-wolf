@@ -1,0 +1,35 @@
+{
+  "comment": "Füge hier projekt-spezifische Keywords hinzu, die beim Indexieren von MD-Files als wichtig erkannt werden sollen",
+  "project_keywords": {
+    "my-project": [
+      "api",
+      "frontend",
+      "backend",
+      "database",
+      "prod-server"
+    ],
+    "default": [
+      "todo",
+      "fixme",
+      "hack",
+      "bug",
+      "security"
+    ]
+  },
+  "section_patterns": {
+    "comment": "Regex patterns für wichtige Sections",
+    "patterns": [
+      "^#+\\s*(WICHTIG|IMPORTANT|CRITICAL)",
+      "^#+\\s*TODO",
+      "^#+\\s*(Deploy|Installation|Setup)",
+      "^!+\\s*.*",
+      "^>\\s*(Warning|Warnung|Achtung)"
+    ]
+  },
+  "command_indicators": {
+    "comment": "Zeichen/Wörter die Commands kennzeichnen",
+    "bash": ["$", "bash", "sh", "zsh"],
+    "code_blocks": ["```", "~~~"],
+    "inline": ["`"]
+  }
+}
