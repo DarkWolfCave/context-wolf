@@ -1,5 +1,5 @@
 """
-Article Research for Context Manager V4
+Article Research for ContextWolf
 Extracts structured experience dossiers from CM entries for blog articles.
 
 Creates chronological timelines, type groupings, and pattern detection
@@ -130,7 +130,7 @@ class ArticleResearchManager:
         entries = self._broad_search(search_queries, project, days_back, topic=topic)
 
         if not entries:
-            return f"# Research Dossier: {topic}\n\nKeine Einträge gefunden.\n\nVerwendete Suchbegriffe: {', '.join(search_queries)}"
+            return f"# Research Dossier: {topic}\n\nNo entries found.\n\nSearch terms used: {', '.join(search_queries)}"
 
         # Step 3: Load full content for found entries
         self._enrich_with_content(entries)
@@ -153,13 +153,13 @@ class ArticleResearchManager:
             note_id = self.notes_manager.add_note(
                 title=f"Research: {topic}",
                 content=dossier,
-                project_name=note_project or 'context-manager',
+                project_name=note_project or Path.cwd().name,
                 tags=f"research,dossier,{topic.lower().replace(' ', '-')}"
             )
 
         # Add save confirmation
         if note_id:
-            dossier += f"\n\n---\n📝 Dossier gespeichert als Notiz #{note_id}"
+            dossier += f"\n\n---\n📝 Dossier saved as note #{note_id}"
 
         return dossier[:self.MAX_DOSSIER_LENGTH]
 
@@ -501,7 +501,7 @@ class ArticleResearchManager:
             if len(fixes) >= 2:
                 patterns.append({
                     'type': 'recurring_problem',
-                    'description': f"{len(fixes)} Fixes innerhalb von {cluster['start_date']} - {cluster['end_date']}",
+                    'description': f"{len(fixes)} fixes within {cluster['start_date']} - {cluster['end_date']}",
                     'entries': fixes,
                     'projects': cluster.get('projects', set()),
                     'severity': 'high' if len(fixes) >= 3 else 'medium',
@@ -565,9 +565,9 @@ class ArticleResearchManager:
         # Header
         lines.append(f"# Research Dossier: {topic}")
         lines.append("")
-        lines.append(f"**Generiert:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        lines.append(f"**Einträge analysiert:** {len(entries)} aus {len(projects)} Projekt(en)")
-        lines.append(f"**Zeitraum:** {earliest} bis {latest}")
+        lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"**Entries analyzed:** {len(entries)} from {len(projects)} project(s)")
+        lines.append(f"**Time range:** {earliest} to {latest}")
         # Search source stats
         fts_count = sum(1 for e in entries if e.get('_search_source') == 'fts')
         vector_count = sum(1 for e in entries if e.get('_search_source') == 'vector')
@@ -575,9 +575,9 @@ class ArticleResearchManager:
         if vector_count > 0:
             search_method += f", Semantisch: {vector_count}"
 
-        lines.append(f"**Suchbegriffe:** {', '.join(queries)}")
-        lines.append(f"**Suchmethode:** {search_method}")
-        lines.append(f"**Projekte:** {', '.join(sorted(projects))}")
+        lines.append(f"**Search terms:** {', '.join(queries)}")
+        lines.append(f"**Search method:** {search_method}")
+        lines.append(f"**Projects:** {', '.join(sorted(projects))}")
         lines.append("")
 
         # Executive Summary
@@ -588,29 +588,29 @@ class ArticleResearchManager:
 
         type_summary = []
         group_labels = {
-            'problems_fixes': 'Probleme/Fixes',
-            'decisions': 'Entscheidungen',
+            'problems_fixes': 'Problems/Fixes',
+            'decisions': 'Decisions',
             'features': 'Features',
             'refactoring': 'Refactoring',
-            'infrastructure': 'Infrastruktur',
-            'documentation': 'Dokumentation',
+            'infrastructure': 'Infrastructure',
+            'documentation': 'Documentation',
             'tests': 'Tests',
-            'other': 'Sonstiges',
+            'other': 'Other',
         }
         for group_key, group_entries in type_groups.items():
             label = group_labels.get(group_key, group_key)
-            type_summary.append(f"- **{label}:** {len(group_entries)} Einträge")
+            type_summary.append(f"- **{label}:** {len(group_entries)} entries")
         lines.extend(type_summary)
 
-        lines.append(f"- **Zeitcluster:** {len(clusters)} zusammenhängende Arbeitsphasen")
-        lines.append(f"- **Erkannte Muster:** {len(patterns)}")
+        lines.append(f"- **Time clusters:** {len(clusters)} contiguous work phases")
+        lines.append(f"- **Detected patterns:** {len(patterns)}")
         lines.append("")
 
         # Patterns section (most valuable for articles)
         if patterns:
             lines.append("---")
             lines.append("")
-            lines.append("## Erkannte Muster")
+            lines.append("## Detected patterns")
             lines.append("")
 
             recurring = [p for p in patterns if p['type'] == 'recurring_problem']
@@ -618,7 +618,7 @@ class ArticleResearchManager:
             iterative = [p for p in patterns if p['type'] == 'iterative_development']
 
             if recurring:
-                lines.append("### Wiederkehrende Probleme")
+                lines.append("### Recurring problems")
                 lines.append("")
                 for p in recurring:
                     lines.append(f"- **{p['description']}** (Severity: {p['severity']})")
@@ -633,11 +633,11 @@ class ArticleResearchManager:
                     fix = p['fix']
                     decision = p['decision']
                     lines.append(f"- **Fix** #{fix['id']}: {self._truncate(fix.get('summary', ''), 100)}")
-                    lines.append(f"  → **Decision** #{decision['id']} ({p['gap_hours']}h später): {self._truncate(decision.get('summary', ''), 100)}")
+                    lines.append(f"  → **Decision** #{decision['id']} ({p['gap_hours']}h later): {self._truncate(decision.get('summary', ''), 100)}")
                 lines.append("")
 
             if iterative:
-                lines.append("### Iterative Entwicklung")
+                lines.append("### Iterative development")
                 lines.append("")
                 for p in iterative:
                     lines.append(f"- **{p['description']}**")
@@ -649,13 +649,13 @@ class ArticleResearchManager:
         if clusters:
             lines.append("---")
             lines.append("")
-            lines.append("## Chronologie (Zeitcluster)")
+            lines.append("## Chronology (time clusters)")
             lines.append("")
 
             for i, cluster in enumerate(clusters, 1):
                 proj_str = ', '.join(sorted(cluster.get('projects', set())))
                 lines.append(f"### Cluster {i}: {cluster['start_date']} – {cluster['end_date']}")
-                lines.append(f"**Projekte:** {proj_str} | **Einträge:** {cluster['entry_count']} | **Dominant:** {cluster['dominant_type']}")
+                lines.append(f"**Projects:** {proj_str} | **Entries:** {cluster['entry_count']} | **Dominant:** {cluster['dominant_type']}")
                 lines.append("")
 
                 for entry in cluster['entries'][:10]:  # Max 10 per cluster
@@ -667,7 +667,7 @@ class ArticleResearchManager:
         # Type groups
         lines.append("---")
         lines.append("")
-        lines.append("## Nach Typ")
+        lines.append("## By type")
         lines.append("")
 
         for group_key, group_entries in type_groups.items():
@@ -686,15 +686,15 @@ class ArticleResearchManager:
                 lines.append(f"- #{entry['id']} ({entry_date}) [{project}]: {summary}")
 
             if len(sorted_group) > 15:
-                lines.append(f"- ... und {len(sorted_group) - 15} weitere")
+                lines.append(f"- ... and {len(sorted_group) - 15} more")
             lines.append("")
 
         # Entry IDs for follow-up
         lines.append("---")
         lines.append("")
-        lines.append("## Rohdaten")
+        lines.append("## Raw data")
         lines.append("")
-        lines.append(f"Alle {len(entries)} Entry-IDs für Nachverfolgung mit `context_show(entry_id=ID)`:")
+        lines.append(f"All {len(entries)} entry IDs for follow-up with `context_show(entry_id=ID)`:")
         lines.append("")
 
         id_list = ', '.join(str(e['id']) for e in sorted(entries, key=lambda e: e.get('timestamp', 0)))

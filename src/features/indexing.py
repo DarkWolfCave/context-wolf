@@ -274,7 +274,7 @@ class IndexingManager:
             except Exception as e:
                 print(f"Error indexing {md_file}: {e}")
 
-        print(f"✅ {indexed} MD-Dateien indexiert")
+        print(f"✅ {indexed} MD files indexed")
         return indexed
 
     def _build_keyword_set(
@@ -377,7 +377,7 @@ class IndexingManager:
 
         section_text = '\n'.join(section_lines)
         self.save_callback(
-            f"📌 WICHTIG aus {file_path.name}:\n"
+            f"📌 IMPORTANT from {file_path.name}:\n"
             f"Section: {section_title}\n"
             f"{section_text[:1000]}",
             action_type='instruction',
@@ -409,7 +409,7 @@ class IndexingManager:
         for cmd in ssh_commands[:5]:
             if len(cmd) > 20:
                 self.save_callback(
-                    f"🔧 SSH Command aus {file_path.name}:\n{cmd}",
+                    f"🔧 SSH Command from {file_path.name}:\n{cmd}",
                     action_type='command',
                     project=project
                 )
@@ -418,7 +418,7 @@ class IndexingManager:
         for cmd in docker_commands[:5]:
             if len(cmd) > 20:
                 self.save_callback(
-                    f"🐳 Docker Command aus {file_path.name}:\n{cmd}",
+                    f"🐳 Docker Command from {file_path.name}:\n{cmd}",
                     action_type='command',
                     project=project
                 )
@@ -426,7 +426,7 @@ class IndexingManager:
         script_paths = re.findall(r'([./][\w/]+\.(?:sh|py|js|rb|pl))', content)
         for script in set(script_paths[:10]):
             self.save_callback(
-                f"📜 Script-Referenz aus {file_path.name}: {script}",
+                f"📜 Script reference from {file_path.name}: {script}",
                 action_type='reference',
                 project=project
             )
@@ -435,7 +435,7 @@ class IndexingManager:
         for path in set(important_paths[:10]):
             if len(path) > 10 and not path.endswith('/'):
                 self.save_callback(
-                    f"📁 Wichtiger Pfad aus {file_path.name}: {path}",
+                    f"📁 Important path from {file_path.name}: {path}",
                     action_type='path',
                     project=project
                 )

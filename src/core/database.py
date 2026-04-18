@@ -1,5 +1,5 @@
 """
-Database Layer for Context Manager V4
+Database Layer for ContextWolf
 PostgreSQL backend with SmartConnection auto-reconnect.
 """
 

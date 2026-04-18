@@ -26,20 +26,17 @@ class SearchManager:
 
     Dependencies:
     - Database (core layer)
-    - Optional: TokenTracker for tracking search operations
     """
 
-    def __init__(self, database: Database, token_tracker=None):
+    def __init__(self, database: Database):
         """
         Initialize SearchManager.
 
         Args:
             database: Database instance
-            token_tracker: Optional TokenTracker instance
         """
         self.db = database
         self.conn = database.conn
-        self.token_tracker = token_tracker
 
     def _build_search_query(self, query: str) -> str:
         """
@@ -265,7 +262,7 @@ class SearchManager:
                 filters.append("a.timestamp >= ?")
                 params.append(from_timestamp)
             except ValueError:
-                print(f"⚠️  Ungültiges Datum: {date_from} (Format: YYYY-MM-DD)")
+                print(f"⚠️  Invalid date: {date_from} (format: YYYY-MM-DD)")
 
         if date_to:
             try:
@@ -273,7 +270,7 @@ class SearchManager:
                 filters.append("a.timestamp <= ?")
                 params.append(to_timestamp)
             except ValueError:
-                print(f"⚠️  Ungültiges Datum: {date_to} (Format: YYYY-MM-DD)")
+                print(f"⚠️  Invalid date: {date_to} (format: YYYY-MM-DD)")
 
         if project and project != "all":
             if project == "current":
@@ -332,10 +329,6 @@ class SearchManager:
             cursor.execute(sql, tuple(params + [limit]))
 
         results = [dict(row) for row in cursor.fetchall()]
-
-        if self.token_tracker:
-            output_text = json.dumps(results)
-            self.token_tracker.track_operation('search', query, output_text)
 
         return results
 

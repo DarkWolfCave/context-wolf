@@ -86,12 +86,11 @@ cm projects
 cm project-delete <name> [--force, -f]
 ```
 
-### session / stats / tokens
+### session / stats
 
 ```
 cm session [--id <session_id>] [--verbose, -v]
 cm stats
-cm tokens
 ```
 
 ### vacuum
@@ -533,7 +532,7 @@ cm setup-mcp             # Configure MCP server in Claude Code
 | `cm related` | Find related entries |
 | `cm projects` | List projects |
 | `cm session` | Current session info |
-| `cm stats` / `cm tokens` | Usage statistics |
+| `cm stats` | Usage statistics |
 | `cm vacuum` | Optimize database |
 | `cm index` | Index Markdown files |
 | `cm tool-stats` | MCP tool usage |

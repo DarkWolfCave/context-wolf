@@ -1,5 +1,5 @@
 """
-Configuration Management for Context Manager V4
+Configuration Management for ContextWolf
 Handles database backend selection and PostgreSQL configuration.
 """
 

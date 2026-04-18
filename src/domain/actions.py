@@ -103,7 +103,7 @@ class ActionManager:
             (content_hash,)
         )
         if existing:
-            print(f"⏭️  Exaktes Duplikat übersprungen (gleicher Inhalt bereits gespeichert)")
+            print(f"⏭️  Exact duplicate skipped (same content already saved)")
             return 0
 
         if self.duplicate_detector:
@@ -112,7 +112,7 @@ class ActionManager:
             if dup_check['should_warn']:
                 print(f"\n{dup_check['recommendation']}")
                 if dup_check['similar_entries']:
-                    print("📎 Ähnliche Einträge:")
+                    print("📎 Similar entries:")
                     for entry in dup_check['similar_entries'][:3]:
                         print(f"   #{entry['id']} [{entry['similarity']:.0%}] {entry['content'][:50]}... ({entry['time_ago']})")
                     print()
@@ -285,7 +285,7 @@ class ActionManager:
         self.conn.commit()
 
         if not silent:
-            print(f"🗑️  Gelöscht: #{entry_id} [{entry['type']}] {entry['summary'][:50]}...")
+            print(f"🗑️  Deleted: #{entry_id} [{entry['type']}] {entry['summary'][:50]}...")
 
         return True
 
@@ -359,11 +359,11 @@ class ActionManager:
         self.conn.commit()
 
         if not silent:
-            print(f"🗑️  Projekt '{project_name}' gelöscht:")
-            print(f"   • {action_count} Einträge entfernt")
-            print(f"   • {snippet_count} Snippets entfernt")
+            print(f"🗑️  Project '{project_name}' deleted:")
+            print(f"   • {action_count} entries removed")
+            print(f"   • {snippet_count} snippets removed")
             if instruction_count > 0:
-                print(f"   • {instruction_count} AI Instructions entfernt")
+                print(f"   • {instruction_count} AI Instructions removed")
 
         return {
             'actions': action_count,

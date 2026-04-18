@@ -402,7 +402,7 @@ Research a topic across all CM entries. Creates a structured dossier with cluste
 
 ```
 # Scoped research (recommended - limits token usage)
-article_research(topic="authentication", project="cronwolf", days_back=30)
+article_research(topic="authentication", project="myapp", days_back=30)
 
 # Broad research (can be very large!)
 article_research(topic="PostgreSQL", save_as_note=true)

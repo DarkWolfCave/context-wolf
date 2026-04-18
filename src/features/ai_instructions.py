@@ -94,7 +94,7 @@ class AIInstructionManager:
 
         existing = cursor.fetchone()
         if existing:
-            print(f"⚠️  Instruction existiert bereits (ID: {existing['id']})")
+            print(f"⚠️  Instruction already exists (ID: {existing['id']})")
             return existing['id']
 
         try:
@@ -328,7 +328,7 @@ class AIInstructionManager:
 
         if scope is not None:
             if scope not in self.VALID_SCOPES:
-                print(f"❌ Ungültiger Scope: {scope} (erlaubt: {', '.join(sorted(self.VALID_SCOPES))})")
+                print(f"❌ Invalid scope: {scope} (allowed: {', '.join(sorted(self.VALID_SCOPES))})")
                 return False
             updates.append("scope = ?")
             params.append(scope)
@@ -342,7 +342,7 @@ class AIInstructionManager:
 
         if priority is not None:
             if priority not in self.VALID_PRIORITIES:
-                print(f"❌ Ungültige Priority: {priority} (erlaubt: {', '.join(sorted(self.VALID_PRIORITIES))})")
+                print(f"❌ Invalid priority: {priority} (allowed: {', '.join(sorted(self.VALID_PRIORITIES))})")
                 return False
             updates.append("priority = ?")
             params.append(priority)
@@ -354,7 +354,7 @@ class AIInstructionManager:
         if instruction is not None:
             instruction = instruction.strip()
             if not instruction:
-                print("❌ Instruction-Text darf nicht leer sein")
+                print("❌ Instruction text must not be empty")
                 return False
             updates.append("instruction = ?")
             params.append(instruction)
@@ -376,7 +376,7 @@ class AIInstructionManager:
             params.append(json.dumps(metadata) if metadata else None)
 
         if not updates:
-            print("❌ Keine Updates angegeben")
+            print("❌ No updates specified")
             return False
 
         updates.append("updated_at = EXTRACT(epoch FROM now())::bigint")

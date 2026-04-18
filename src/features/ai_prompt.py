@@ -30,7 +30,7 @@ class AIPromptManager:
                                include_snippets: bool = True, verbose: bool = False,
                                smart: bool = False, hours: int = 24) -> str:
         """
-        Generiere vollständigen Session-Start Prompt
+        Generate full session-start prompt
 
         Args:
             project: Project name (default: current directory)
@@ -65,37 +65,37 @@ class AIPromptManager:
                 print(f"⚠️  Smart mode failed, falling back to normal: {e}", file=__import__('sys').stderr)
                 smart = False
 
-        # Sammle Context-Informationen
+        # Collect context information
         context_parts = []
 
         # Header with token info (will be updated at the end)
         header_placeholder = "___HEADER_PLACEHOLDER___"
         context_parts.append(header_placeholder)
 
-        # Letzte Session Summary
+        # Last session summary
         session_info = self._get_session_summary(project)
         if session_info:
             context_parts.append(f"""
-## 📅 Letzte Session ({session_info['time']}):
+## 📅 Last session ({session_info['time']}):
 {session_info['summary']}
 """)
 
-        # Aktueller Stand aus DB
+        # Current state from DB
         stats = self._get_project_stats(project)
         if stats:
             context_parts.append(f"""
-## 📊 Aktueller Stand:
-- Einträge im Projekt: {stats['entry_count']}
-- Letzte Aktivität: {stats['last_activity']}
-- Hauptsächlich: {', '.join(stats['top_types'])}
+## 📊 Current state:
+- Entries in project: {stats['entry_count']}
+- Last activity: {stats['last_activity']}
+- Mainly: {', '.join(stats['top_types'])}
 """)
 
-        # Offene TODOs
+        # Open TODOs
         if include_todos:
             todos = self._get_open_todos(project)
             if todos:
                 context_parts.append(f"""
-## 📝 Offene TODOs:
+## 📝 Open TODOs:
 {todos}
 """)
 
@@ -106,7 +106,7 @@ class AIPromptManager:
 ## 🔀 Git Status:
 - Branch: {git_info['branch']}
 - Uncommitted: {git_info['changes']}
-- Letzter Commit: {git_info['last_commit']}
+- Last commit: {git_info['last_commit']}
 """)
 
         # Top Snippets
@@ -114,61 +114,61 @@ class AIPromptManager:
             snippets = self._get_top_snippets(project)
             if snippets:
                 context_parts.append(f"""
-## 📌 Wichtige Snippets:
+## 📌 Important snippets:
 {snippets}
 """)
 
-        # Commands für KI
+        # Commands for AI
         context_parts.append(f"""
-## 🎯 WICHTIGE COMMANDS für diese Session:
+## 🎯 KEY COMMANDS for this session:
 
 ```bash
-# ZUERST: Hole aktuellen Context
-cm session           # Zeigt heutige Aktivitäten
-cm search "TODO:" --project {project}  # Offene TODOs
-cm stats             # Projekt-Statistiken
+# FIRST: Fetch current context
+cm session           # Shows today's activities
+cm search "TODO:" --project {project}  # Open TODOs
+cm stats             # Project statistics
 
-# WÄHREND DER ARBEIT: Speichere ALLES
-cm save "Was gemacht wurde" --type code
+# DURING WORK: Save EVERYTHING
+cm save "What was done" --type code
 
-# BEI PROBLEMEN: Suche in Historie
-cm search "ähnliches problem" --project {project}
-cm related <ID>      # Zeige verwandte Lösungen
+# ON ISSUES: Search history
+cm search "similar problem" --project {project}
+cm related <ID>      # Show related solutions
 
-# AM ENDE: Dokumentiere Fortschritt
-cm save "✅ Milestone erreicht" --type milestone
+# AT THE END: Document progress
+cm save "✅ Milestone reached" --type milestone
 ```
 
-## ⚡ KI-REGELN:
+## ⚡ AI RULES:
 
-1. **IMMER den Context Manager nutzen:**
-   - Bei JEDER Änderung: `cm save "was gemacht" --type code`
-   - Bei Problemen: `cm search "fehler"`
+1. **ALWAYS use the Context Manager:**
+   - On EVERY change: `cm save "what was done" --type code`
+   - On issues: `cm search "error"`
 
-2. **NIE interaktive Prompts nutzen:**
-   - `cm delete <id> --force` (mit --force!)
-   - Keine y/n Fragen stellen
+2. **NEVER use interactive prompts:**
+   - `cm delete <id> --force` (with --force!)
+   - Don't ask y/n questions
 
-3. **Duplicate Detection beachten:**
-   - Wenn "Ähnlicher Eintrag gefunden" → ist OK, wird trotzdem gespeichert
-   - Mit `cm related <id>` verwandte Einträge prüfen
+3. **Respect Duplicate Detection:**
+   - When similar entry found → that's OK, will be saved anyway
+   - Use `cm related <id>` to check related entries
 
-4. **Git-Integration nutzen:**
-   - Commits werden automatisch getrackt
+4. **Use Git integration:**
+   - Commits are tracked automatically
    - `cm search "commit:" --date-from {(current_time - timedelta(days=7)).strftime('%Y-%m-%d')}`
 """)
 
-        # AI-Instructions hinzufügen (mit Smart-Filtering wenn aktiviert)
+        # Add AI instructions (with smart filtering if enabled)
         ai_instructions = self._get_ai_instructions(project, smart=smart, context=work_context)
         if ai_instructions:
             context_parts.append(ai_instructions)
 
-        # Verbose Mode mit mehr Details
+        # Verbose mode with more details
         if verbose:
             recent_entries = self._get_recent_entries(project, limit=5)
             if recent_entries:
                 context_parts.append(f"""
-## 📜 Letzte 5 Einträge:
+## 📜 Last 5 entries:
 {recent_entries}
 """)
 
@@ -195,11 +195,11 @@ Technologies: {', '.join(list(work_context.get('technologies', []))[:5])}
 Actions Analyzed: {work_context.get('action_count', 0)} (last {hours}h)
 """
 
-        header += f"""Zeit: {current_time.strftime('%Y-%m-%d %H:%M')}
-Projekt: {project}
+        header += f"""Time: {current_time.strftime('%Y-%m-%d %H:%M')}
+Project: {project}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Wir arbeiten am Context Manager V2 in {Path.cwd()}
+Working on {project} in {Path.cwd()}
 """
 
         # Replace placeholder with actual header
@@ -208,7 +208,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return final_prompt
 
     def _get_session_summary(self, project: str) -> dict:
-        """Hole letzte Session Summary"""
+        """Get last session summary"""
         cursor = self.conn.cursor()
 
         # Backend-specific datetime formatting
@@ -236,7 +236,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return None
 
     def _get_project_stats(self, project: str) -> dict:
-        """Hole Projekt-Statistiken"""
+        """Get project statistics"""
         cursor = self.conn.cursor()
 
         # Backend-specific datetime formatting
@@ -277,7 +277,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return None
 
     def _get_open_todos(self, project: str, limit: int = 5) -> str:
-        """Hole offene TODOs"""
+        """Get open TODOs"""
         results = self.search.search("TODO:", project=project, limit=limit)
 
         if results:
@@ -296,7 +296,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return None
 
     def _get_git_status(self) -> dict:
-        """Hole Git Status wenn verfügbar"""
+        """Get git status if available"""
         if not self.git_integration:
             return None
 
@@ -305,18 +305,18 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
             if info:
                 return {
                     'branch': info.get('branch', 'unknown'),
-                    'changes': 'Ja' if info.get('has_changes') else 'Nein',
+                    'changes': 'Yes' if info.get('has_changes') else 'No',
                     'last_commit': info.get('last_commit', 'unknown')
                 }
-        except:
+        except Exception:
             pass
         return None
 
     def _get_top_snippets(self, project: str, limit: int = 3) -> str:
-        """Hole meistgenutzte Snippets"""
+        """Get most-used snippets"""
         try:
             snippets = self.snippets.list_all(limit=limit)
-        except:
+        except Exception:
             return None
         if snippets:
             snippet_lines = []
@@ -328,7 +328,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return None
 
     def _get_recent_entries(self, project: str, limit: int = 5) -> str:
-        """Hole letzte Einträge für verbose mode"""
+        """Get recent entries for verbose mode"""
         cursor = self.conn.cursor()
 
         # Backend-specific datetime formatting
@@ -356,7 +356,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
 
     def _get_ai_instructions(self, project: str, smart: bool = False, context: Dict = None) -> str:
         """
-        Hole aktive AI-Instructions (mit optionalem Smart-Filtering)
+        Get active AI instructions (with optional smart filtering)
 
         Args:
             project: Project name
@@ -376,11 +376,11 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         if not instructions:
             return None
 
-        # Trenne globale und projekt-spezifische Instructions
+        # Separate global and project-specific instructions
         global_instructions = [inst for inst in instructions if inst['scope'] == 'global']
         project_instructions = [inst for inst in instructions if inst['scope'] == 'project']
 
-        # Gruppiere nach Priorität für beide Kategorien
+        # Group by priority for both categories
         def group_by_priority(inst_list):
             by_priority = {'must': [], 'should': [], 'nice': []}
             for inst in inst_list:
@@ -392,66 +392,66 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         global_by_priority = group_by_priority(global_instructions)
         project_by_priority = group_by_priority(project_instructions)
 
-        # Baue Output String
+        # Build output string
         output = []
 
-        # GLOBALE INSTRUCTIONS zuerst
+        # GLOBAL INSTRUCTIONS first
         if global_instructions:
-            output.append("## 🌍 GLOBALE KI-ANWEISUNGEN (gelten für ALLE Projekte):\n")
+            output.append("## 🌍 GLOBAL AI INSTRUCTIONS (apply to ALL projects):\n")
 
             if global_by_priority['must']:
-                output.append("### 🔴 MUST (Kritisch - IMMER befolgen):")
+                output.append("### 🔴 MUST (Critical - ALWAYS follow):")
                 for inst in global_by_priority['must']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
                 output.append("")
 
             if global_by_priority['should']:
-                output.append("### 🟡 SHOULD (Wichtig - normalerweise befolgen):")
+                output.append("### 🟡 SHOULD (Important - usually follow):")
                 for inst in global_by_priority['should']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
                 output.append("")
 
             if global_by_priority['nice']:
-                output.append("### 🟢 NICE (Optional - wenn möglich):")
+                output.append("### 🟢 NICE (Optional - when possible):")
                 for inst in global_by_priority['nice']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
                 output.append("")
 
-        # PROJEKT-SPEZIFISCHE INSTRUCTIONS danach
+        # PROJECT-SPECIFIC INSTRUCTIONS after
         if project_instructions:
-            output.append(f"## 📁 PROJEKT-SPEZIFISCHE KI-ANWEISUNGEN ({project}):\n")
+            output.append(f"## 📁 PROJECT-SPECIFIC AI INSTRUCTIONS ({project}):\n")
 
             if project_by_priority['must']:
-                output.append("### 🔴 MUST (Kritisch - IMMER befolgen):")
+                output.append("### 🔴 MUST (Critical - ALWAYS follow):")
                 for inst in project_by_priority['must']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
                     if inst.get('rationale'):
-                        output.append(f"  → Grund: {inst['rationale']}")
+                        output.append(f"  → Reason: {inst['rationale']}")
                     if inst.get('examples'):
                         import json
                         try:
                             examples = json.loads(inst['examples'])
                             if examples.get('good'):
-                                output.append(f"  ✅ Gut: {examples['good']}")
+                                output.append(f"  ✅ Good: {examples['good']}")
                             if examples.get('bad'):
-                                output.append(f"  ❌ Schlecht: {examples['bad']}")
-                        except:
+                                output.append(f"  ❌ Bad: {examples['bad']}")
+                        except Exception:
                             pass
                 output.append("")
 
             if project_by_priority['should']:
-                output.append("### 🟡 SHOULD (Wichtig - normalerweise befolgen):")
+                output.append("### 🟡 SHOULD (Important - usually follow):")
                 for inst in project_by_priority['should']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
                 output.append("")
 
             if project_by_priority['nice']:
-                output.append("### 🟢 NICE (Optional - wenn möglich):")
+                output.append("### 🟢 NICE (Optional - when possible):")
                 for inst in project_by_priority['nice']:
                     category = f"[{inst['category'].upper()}]" if inst['category'] else ""
                     output.append(f"- {category} {inst['instruction']}")
@@ -605,7 +605,7 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
                 score += 0.3
             # Project-specific categories: Check if working on that project
             elif category in ['architecture', 'mcp']:
-                if context.get('project') == 'context-manager':
+                if context.get('project') == 'context-wolf':
                     score += 0.3
                 # Otherwise: 0.0 (not relevant for other projects)
             # Conditional categories: Check if context matches
@@ -709,21 +709,21 @@ Wir arbeiten am Context Manager V2 in {Path.cwd()}
         return relevant
 
     def generate_quick_start(self, project: str = None) -> str:
-        """Generiere Kurzversion für schnellen Start"""
+        """Generate short version for quick start"""
         project = project or Path.cwd().name
 
         return f"""
-Wir arbeiten am Context Manager V2 in {Path.cwd()}
+Working on {project} in {Path.cwd()}
 
-AKTUELLER STAND:
-cm session  # Zeigt heutige Aktionen
-cm search "TODO:" --project {project}  # Zeigt alle offenen TODOs
+CURRENT STATE:
+cm session  # Shows today's actions
+cm search "TODO:" --project {project}  # Shows all open TODOs
 
-STARTE MIT DIESEN COMMANDS:
+START WITH THESE COMMANDS:
 cm search "TODO:" --project {project}
 cm search "bug" --days 7
 cm stats
 
-WICHTIG: Nutze IMMER den Context Manager für Änderungen!
-cm save "was gemacht" --type code
+IMPORTANT: ALWAYS use ContextWolf for changes!
+cm save "what was done" --type code
 """

@@ -194,7 +194,7 @@ class InfrastructureManager:
             if host_dict.get('tags'):
                 try:
                     host_dict['tags'] = json.loads(host_dict['tags'])
-                except:
+                except Exception:
                     host_dict['tags'] = []
 
             # Filter by tags if specified
@@ -239,7 +239,7 @@ class InfrastructureManager:
         if host_dict.get('tags'):
             try:
                 host_dict['tags'] = json.loads(host_dict['tags'])
-            except:
+            except Exception:
                 host_dict['tags'] = []
 
         # Get services for this host
@@ -255,7 +255,7 @@ class InfrastructureManager:
             if service_dict.get('tags'):
                 try:
                     service_dict['tags'] = json.loads(service_dict['tags'])
-                except:
+                except Exception:
                     service_dict['tags'] = []
             services.append(service_dict)
 
@@ -548,7 +548,7 @@ class InfrastructureManager:
             if service_dict.get('tags'):
                 try:
                     service_dict['tags'] = json.loads(service_dict['tags'])
-                except:
+                except Exception:
                     service_dict['tags'] = []
             results.append(service_dict)
 
@@ -738,7 +738,7 @@ class InfrastructureManager:
                 if host_dict.get('tags'):
                     try:
                         host_dict['tags'] = json.loads(host_dict['tags'])
-                    except:
+                    except Exception:
                         host_dict['tags'] = []
                 results['hosts'].append(host_dict)
 
@@ -777,7 +777,7 @@ class InfrastructureManager:
                 if service_dict.get('tags'):
                     try:
                         service_dict['tags'] = json.loads(service_dict['tags'])
-                    except:
+                    except Exception:
                         service_dict['tags'] = []
                 results['services'].append(service_dict)
 

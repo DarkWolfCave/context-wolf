@@ -1,15 +1,24 @@
 # ContextWolf
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB.svg)](https://python.org)
+[![MCP](https://img.shields.io/badge/MCP-Server-8A2BE2.svg)](https://modelcontextprotocol.io)
+[![pgvector](https://img.shields.io/badge/pgvector-Hybrid%20Search-336791.svg)](https://github.com/pgvector/pgvector)
+
 A high-performance local knowledge system for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) via MCP integration.
 Stores decisions, code snippets, infrastructure details, and TODOs - so your AI assistant never forgets what you've already decided.
+
+![ContextWolf Demo](demo.gif)
 
 ## What it does
 
 - **Cross-Project Search** - Full-text search + semantic vector search across all projects
 - **MCP Integration** - 31 tools available directly in Claude Code sessions
+- **Notes** - Long-form reference documents with tags and full-text search
+- **Snippets** - Code snippet library with tags and type detection
 - **Infrastructure Tracking** - Structured SSH host & service management
 - **TODO Lifecycle** - Task tracking with priorities, categories, and status
-- **Git Integration** - Auto-tracks commits via post-commit hooks
+- **Git Integration** - Post-commit hooks auto-track commits (opt-in per repo)
 - **Duplicate Detection** - Warns at 85%+ similarity
 
 ## Why?
@@ -51,20 +60,33 @@ You could store context in `.md` files or `CLAUDE.md`. That works for small proj
 - **Python 3.12+**
 - **Docker** (recommended for PostgreSQL) or an existing PostgreSQL 13+ with [pgvector](https://github.com/pgvector/pgvector)
 
+## Architecture
+
+ContextWolf runs in two parts:
+
+- **PostgreSQL + pgvector** (the storage) - one container, runs anywhere (local Docker, a Raspberry Pi, a NAS)
+- **`cm-mcp`** (the MCP server) - always runs locally on your coding machine, launched by Claude Code via stdio
+
+The optional GUI ([context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui)) is a third component that reuses the same database - it never runs its own PostgreSQL instance.
+
 ## Quick Start
 
 ```bash
 git clone https://github.com/DarkWolfCave/context-wolf.git
 cd context-wolf
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD
 bash setup.sh
 ```
 
 That's it. The setup script will:
 1. Install [uv](https://docs.astral.sh/uv/) (fast Python package manager) if needed
 2. Install all dependencies
-3. Walk you through database configuration (Docker or external PostgreSQL)
-4. Configure Claude Code MCP integration
-5. Run diagnostics to verify everything works
+3. Start PostgreSQL via `docker compose up -d` (reads credentials from `.env`)
+4. Write `~/.context/config.yaml` (CLI config, same credentials as `.env`)
+5. Download the ONNX embedding model (~90 MB, for semantic search)
+6. Configure Claude Code MCP integration
+7. Run diagnostics to verify everything works
 
 <details>
 <summary>Manual setup (advanced)</summary>
@@ -76,11 +98,16 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install dependencies (pick what you need)
 uv sync                        # Core CLI only
 uv sync --extra mcp            # + MCP server for Claude Code
-uv sync --extra embeddings     # + Semantic search (ONNX, ~200MB)
+uv sync --extra embeddings     # + Semantic search (ONNX, ~90 MB)
 uv sync --extra all            # Everything
 
-# Configure database
-cm init                        # Interactive wizard
+# Start PostgreSQL
+cp .env.example .env
+# edit .env, set POSTGRES_PASSWORD
+docker compose up -d
+
+# Configure CLI (reads .env for credentials)
+cm init                        # Writes ~/.context/config.yaml
 
 # Configure Claude Code
 cm setup-mcp                   # Writes ~/.claude.json
@@ -90,6 +117,21 @@ cm doctor
 ```
 
 </details>
+
+### Configuration files
+
+Two files with identical credentials:
+
+- **`.env`** - used by Docker Compose when starting PostgreSQL
+- **`~/.context/config.yaml`** - used by the CLI and MCP server to connect
+
+`cm init` reads `.env` and writes `config.yaml` so both stay in sync. Change the password? Edit both files, restart the container, and run `cm init` again.
+
+### Data location
+
+By default, PostgreSQL data is stored in `./data/postgres/` next to `docker-compose.yml` (the directory is gitignored). This makes the data easy to find, back up, or delete.
+
+To store data elsewhere (e.g., in your home directory or on a separate SSD), edit the `volumes:` line in `docker-compose.yml`. Examples are in the comments at the top of that file.
 
 ## Setup Script Options
 
@@ -103,26 +145,27 @@ bash setup.sh --setup-mcp      # Configure Claude Code MCP
 
 ### Database on a separate server
 
-If you want PostgreSQL on a different machine (e.g., a Raspberry Pi or NAS):
+If you want PostgreSQL on a different machine (e.g., a Raspberry Pi or NAS) and the MCP server on your local machine:
 
 ```bash
-# 1. Copy docker-compose.yml to the server
-scp docker-compose.yml user@your-server:~/context-wolf/
+# 1. On the server: clone the repo, configure .env, start PostgreSQL
+ssh user@your-server
+git clone https://github.com/DarkWolfCave/context-wolf.git
+cd context-wolf
+cp .env.example .env
+# Edit .env, set POSTGRES_PASSWORD
+docker compose up -d
 
-# 2. IMPORTANT: The default config binds to localhost only (127.0.0.1).
-#    For remote access, edit docker-compose.yml on the server and change:
-#      "127.0.0.1:5432:5432"  →  "5432:5432"
-#    This allows connections from your local machine over the network.
-
-# 3. Start PostgreSQL there
-ssh user@your-server "cd ~/context-wolf && docker compose up -d"
-
-# 4. On your local machine, choose "External server" during setup
+# 2. On your local machine: install CLI, choose "External server"
+git clone https://github.com/DarkWolfCave/context-wolf.git
+cd context-wolf
+bash setup.sh --install-only
 cm init
-# → Option [2], then enter the server's IP, port 5432, user cm_user, password
+# → Option [2], enter the server's IP, port 5432, matching user/password
+cm setup-mcp
 ```
 
-> **Security note:** `127.0.0.1:5432:5432` (default) means only processes on the same machine can connect - ideal when DB and app run on the same host. Changing to `5432:5432` exposes the port on all network interfaces. If your server is accessible from untrusted networks, use a firewall or bind to a specific IP (e.g., `192.168.1.37:5432:5432`).
+> **Security note:** The compose file exposes PostgreSQL on port 5432 on all network interfaces of the server. For untrusted networks, restrict access with a firewall, bind to a specific IP (edit the `ports:` line: `"192.168.1.37:5432:5432"`), or tunnel through Tailscale/WireGuard. PostgreSQL is password-protected but raw port exposure is still a surface area.
 
 ## Usage
 
@@ -151,7 +194,7 @@ cm todo done 123
 cm ai-instruction "Always use snake_case" --category style --priority should
 
 # Infrastructure
-cm infra add-host "web01" --ip 10.0.0.1 --user deploy --location dc-1
+cm infra add-host "web01" --ip 10.0.0.1 --user deploy --location extern
 cm infra list-hosts
 ```
 
@@ -193,7 +236,7 @@ For automatic updates, set up a cron job or launchd timer (see `embedding_worker
 **Your data stays yours.** ContextWolf runs entirely on your infrastructure:
 
 - **Local database** - PostgreSQL on your machine, NAS, or Raspberry Pi. Your stored data stays on your infrastructure. (Note: Your conversation with Claude itself goes through Anthropic's API as usual - ContextWolf doesn't change that.)
-- **Local embeddings** - Semantic search uses a lightweight ONNX model (all-MiniLM-L6-v2, 86MB) running on your CPU. Zero API calls for vector generation.
+- **Local embeddings** - Semantic search uses a lightweight ONNX model (all-MiniLM-L6-v2, ~90 MB) running on your CPU. Zero API calls for vector generation.
 - **On-demand retrieval** - ContextWolf does NOT inject your entire database into Claude's context. MCP tools return only the relevant results for the current query (ranked by full-text search + vector similarity).
 
 **Token overhead:** The 31 MCP tool definitions are deferred by default - only tool names are loaded at session start (~356 tokens). Full schemas are fetched on-demand when Claude actually uses a tool. The actual data is only retrieved when a tool is called.
@@ -228,6 +271,14 @@ Dependencies flow inward only.
 - [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) - MCP tools reference (31 tools)
 - [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) - Complete CLI command reference
 - [CHANGELOG.md](CHANGELOG.md) - Version history
+
+## Background
+
+ContextWolf started as a simple CLI tool to help me keep context across Claude Code sessions. No MCP, no vector search - just saving and retrieving decisions so I wouldn't repeat myself.
+
+It grew from there, one feature at a time, based on whatever I needed next: notes, TODOs, infrastructure tracking, code snippets, semantic search. I used earlier versions in production for quite a while before several people suggested I should make it publicly available. That led to V5 - a cleanup and restructure for open source release.
+
+That said, this is a personal project that grew organically over multiple versions. There may still be rough edges or leftover code from earlier iterations. If you find something broken or improvable, please [open an issue](https://github.com/DarkWolfCave/context-wolf/issues) or submit a PR. Contributions are welcome.
 
 ## License
 

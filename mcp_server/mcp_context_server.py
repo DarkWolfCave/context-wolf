@@ -151,7 +151,7 @@ def context_save(
     actual_project = project or "global"
     no_project_warning = ""
     if not project:
-        no_project_warning = "Warning: Kein Projekt angegeben - unter 'global' gespeichert.\n   Tipp: Nutze context_move(entry_id=ID, project=\"projektname\") zum Verschieben.\n"
+        no_project_warning = "Warning: No project specified - saved under 'global'.\n   Tip: Use context_move(entry_id=ID, project=\"projectname\") to move it.\n"
 
     action_id = am.save(
         content=content,
@@ -332,7 +332,7 @@ def todo_add(
         category=category,
         project_name=project,
     )
-    return f"TODO erstellt (ID: {todo_id})"
+    return f"TODO created (ID: {todo_id})"
 
 
 @mcp.tool()
@@ -357,7 +357,7 @@ def todo_list(
         scope_msg = f" for project '{project}'" if effective_project else " (all projects)"
         return f"No TODOs found{scope_msg}"
 
-    response = [f"TODOs ({len(todos)} Eintraege):"]
+    response = [f"TODOs ({len(todos)} entries):"]
     for t in todos[:20]:
         status_icon = {"open": "o", "in_progress": ">", "done": "x"}.get(t["status"], "?")
         priority_icon = {"high": "!", "normal": "-", "low": "."}.get(t.get("priority"), "-")
@@ -405,7 +405,7 @@ def todo_start(
     """Start working on a TODO task."""
     tm = get_mgr(ctx, "todo_manager")
     tm.update_status(int(todo_id), "in_progress")
-    return f"TODO #{todo_id} wird bearbeitet"
+    return f"TODO #{todo_id} in progress"
 
 
 @mcp.tool()
@@ -417,7 +417,7 @@ def todo_done(
     """Mark a TODO task as done."""
     tm = get_mgr(ctx, "todo_manager")
     tm.mark_done([int(todo_id)])
-    return f"Erledigt: {todo_id}"
+    return f"Done: {todo_id}"
 
 
 @mcp.tool()

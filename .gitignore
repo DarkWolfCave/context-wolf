@@ -22,6 +22,9 @@ venv/
 *.db
 *.db-journal
 
+# PostgreSQL data (docker-compose bind mount)
+data/
+
 # Logs
 *.log
 

@@ -1,46 +1,60 @@
-# ContextWolf - PostgreSQL Quick Start
+# ContextWolf - PostgreSQL Base Stack
+#
+# This is THE database for ContextWolf. The CLI/MCP server connects to it
+# directly. The optional GUI (context-wolf-ui) joins the same network so
+# it uses the exact same database - one data store, one source of truth.
 #
 # Usage:
-#   docker compose up -d        # Start PostgreSQL with pgvector
-#   docker compose down          # Stop (data persists in volume)
-#   docker compose down -v       # Stop and DELETE all data
+#   cp .env.example .env
+#   # Edit .env and set POSTGRES_PASSWORD
+#   docker compose up -d
 #
-# After starting, run: cm init (or configure manually)
+# Data location:
+#   By default, PostgreSQL data lives in ./data/postgres/ next to this file.
+#   The directory is created on first start and listed in .gitignore.
+#   To use a different path, change the volume line below. Examples:
+#     - ${HOME}/.context/pgdata:/var/lib/postgresql   # User home
+#     - /mnt/ssd/contextwolf:/var/lib/postgresql      # Custom mount
+#
+# PostgreSQL 18 note:
+#   The mount is on the PARENT directory /var/lib/postgresql so PG18 can
+#   manage its own subdirectory (18/docker/). DO NOT set PGDATA.
 
 services:
   postgres:
-    image: pgvector/pgvector@sha256:494dff7e67e7bc2c826b94c331364978d145ebb86fd338154138b084223b7f67
-    container_name: cm-postgres
+    image: pgvector/pgvector:0.8.2-pg18-trixie@sha256:058fdb396f7b11f66cb7084db6c970846f8cb3a36b101b2714bea6727d530322
+    container_name: cm_postgres
     restart: unless-stopped
-    ports:
-      # Localhost only - access from this machine only (secure default).
-      # For remote access (e.g., DB on Raspberry Pi, app on Mac),
-      # change to "5432:5432" or "192.168.x.x:5432:5432"
-      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_DB: context_manager
-      POSTGRES_USER: cm_user
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_USER: ${POSTGRES_USER:-cm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-context_manager}
+      TZ: ${TZ:-Europe/Berlin}
+    command: >-
+      postgres
+      -c tcp_keepalives_idle=60
+      -c tcp_keepalives_interval=10
+      -c tcp_keepalives_count=6
+      -c timezone=${TZ:-Europe/Berlin}
     volumes:
-      - cm_data:/var/lib/postgresql/data
-    tmpfs:
-      - /tmp:noexec,nosuid,size=64m
-      - /run/postgresql:noexec,nosuid,size=64m
+      - ./data/postgres:/var/lib/postgresql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - contextwolf-net
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
-      - FOWNER
-      - DAC_READ_SEARCH
+    shm_size: 128m
+    mem_limit: 512m
+    cpus: 1.0
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cm_user -d context_manager"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cm_user} -d ${POSTGRES_DB:-context_manager}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
-volumes:
-  cm_data:
+networks:
+  contextwolf-net:
+    name: contextwolf-net

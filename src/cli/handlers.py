@@ -49,12 +49,11 @@ class CommandHandlers:
 
         # Initialize optional integrations
         self.duplicate_detector = self._init_duplicate_detector()
-        self.token_tracker = self._init_token_tracker()
         self.git_integration = self._init_git_integration()
 
         # Initialize managers
         self.actions = ActionManager(db, self.duplicate_detector)
-        self.search = SearchManager(db, self.token_tracker)
+        self.search = SearchManager(db)
         self.session = SessionManager(db)
         self.snippets = SnippetManager(db)
         self.ai_instructions = AIInstructionManager(db)
@@ -85,14 +84,6 @@ class CommandHandlers:
             print(f"⚠️  DuplicateDetector init failed: {e}", file=sys.stderr)
             return None
 
-    def _init_token_tracker(self):
-        """Initialize TokenTracker if available"""
-        try:
-            from ..features.token_tracking import TokenTracker
-            return TokenTracker()
-        except ImportError:
-            return None
-
     def _init_git_integration(self):
         """Initialize GitIntegration if available"""
         try:
@@ -112,7 +103,7 @@ class CommandHandlers:
         )
 
         if action_id > 0:
-            print(f"✅ Gespeichert (ID: {action_id})")
+            print(f"✅ Saved (ID: {action_id})")
 
             # Check for git hook
             if self.git_integration and not hasattr(self, '_git_check_done'):
@@ -124,7 +115,7 @@ class CommandHandlers:
 
     def handle_index(self, args):
         count = self.indexing.index_md_files(args.directory)
-        print(f"\n✅ {count} MD-Dateien indexiert")
+        print(f"\n✅ {count} MD files indexed")
 
     def handle_session(self, args):
         from datetime import datetime
@@ -133,7 +124,7 @@ class CommandHandlers:
         entries = self.session.get_session(args.id, args.verbose, project_name)
 
         if not entries:
-            print("Keine Einträge in dieser Session")
+            print("No entries in this session")
             return
 
         print(f"\n📅 Session: {args.id or datetime.now().strftime('%Y%m%d_%H')}\n")
@@ -149,9 +140,9 @@ class CommandHandlers:
     def handle_stats(self, args):
         stats = self.stats.get_stats()
 
-        print("\n📊 Context Manager Statistiken\n")
+        print("\n📊 Context Manager Statistics\n")
         print(f"Backend:   {stats.get('backend', 'unknown').upper()}")
-        print(f"Projekte:  {stats['projects']}")
+        print(f"Projects:  {stats['projects']}")
         print(f"Actions:   {stats['actions']}")
         print(f"Sessions:  {stats['sessions']}")
         print(f"Types:     {stats['types']}")
@@ -221,10 +212,10 @@ class CommandHandlers:
         )
 
         if not results:
-            print("Keine Ergebnisse gefunden")
+            print("No results found")
             return
 
-        print(f"\n🔍 Gefunden: {len(results)} Einträge\n")
+        print(f"\n🔍 Found: {len(results)} entries\n")
 
         for entry in results:
             timestamp = datetime.fromtimestamp(entry['timestamp']).strftime('%Y-%m-%d %H:%M')
@@ -255,7 +246,7 @@ class CommandHandlers:
         counts = results['counts']
 
         if counts['total'] == 0:
-            print("Keine Ergebnisse gefunden")
+            print("No results found")
             return
 
         # Show summary
@@ -300,19 +291,19 @@ class CommandHandlers:
         entry = self.actions.get_entry(args.entry_id)
 
         if not entry:
-            print(f"❌ Entry #{args.entry_id} nicht gefunden")
+            print(f"❌ Entry #{args.entry_id} not found")
             return
 
         print(f"\n📋 Entry #{entry['id']}")
         print(f"{'=' * 50}")
-        print(f"📅 Datum:    {entry['created_at']}")
-        print(f"📁 Projekt:  {entry['project']}")
-        print(f"🏷️  Typ:      [{entry['type']}]")
+        print(f"📅 Date:     {entry['created_at']}")
+        print(f"📁 Project:  {entry['project']}")
+        print(f"🏷️  Type:     [{entry['type']}]")
         print(f"📊 Session:  {entry['session_id']}")
         print(f"📝 Summary:  {entry['summary']}")
 
         if entry['content']:
-            print(f"\n💬 Vollständiger Inhalt:")
+            print(f"\n💬 Full content:")
             print(f"{'─' * 50}")
             print(entry['content'])
             print(f"{'─' * 50}")
@@ -325,10 +316,10 @@ class CommandHandlers:
         projects = self.search.list_projects()
 
         if not projects:
-            print("Keine Projekte gefunden")
+            print("No projects found")
             return
 
-        print("\n📁 Projekte:\n")
+        print("\n📁 Projects:\n")
 
         for proj in projects:
             if proj['last_activity']:
@@ -340,9 +331,9 @@ class CommandHandlers:
         print()
 
     def handle_vacuum(self, args):
-        print("🧹 Optimiere Datenbank...")
+        print("🧹 Optimizing database...")
         self.stats.vacuum()
-        print("✅ Datenbank optimiert!")
+        print("✅ Database optimized!")
 
     def handle_cleanup(self, args):
         if args.stats:
@@ -383,7 +374,7 @@ class CommandHandlers:
             if not args.force:
                 response = input(f"\n❓ Delete these {len(entries)} orphaned entries? (y/n): ")
                 if response.lower() != 'y':
-                    print("❌ Abgebrochen")
+                    print("❌ Cancelled")
                     return
 
             deleted = self.cleanup.delete_entries([e['id'] for e in entries])
@@ -402,19 +393,19 @@ class CommandHandlers:
         if args.sessions:
             sessions = self.cleanup.find_cross_project_sessions()
             if not sessions:
-                print("✅ Keine Sessions mit mehreren Projekten gefunden")
+                print("✅ No sessions spanning multiple projects found")
                 return
 
-            print(f"\n🧭 {len(sessions)} Sessions teilen sich mehrere Projekte:\n")
+            print(f"\n🧭 {len(sessions)} sessions span multiple projects:\n")
             for session in sessions[:20]:
                 projects = ', '.join(session['projects'])
                 print(
                     f"  Session {session['session_id']} → {projects} "
-                    f"({session['action_count']} Aktionen)"
+                    f"({session['action_count']} actions)"
                 )
 
             if len(sessions) > 20:
-                print(f"\n  ... und {len(sessions) - 20} weitere")
+                print(f"\n  ... and {len(sessions) - 20} more")
             print("\n💡 Run 'cm cleanup --normalize-sessions' to separate them per project")
             return
 
@@ -425,13 +416,6 @@ class CommandHandlers:
         print("  --legacy                List entries without file tracking")
         print("  --sessions              List sessions spanning multiple projects")
         print("  --normalize-sessions    Assign project-specific session IDs")
-
-    def handle_tokens(self, args):
-        if not self.token_tracker:
-            print("❌ TokenTracker nicht verfügbar")
-            return
-
-        self.token_tracker.print_summary()
 
     # ==================== SNIPPET COMMANDS ====================
 
@@ -445,7 +429,7 @@ class CommandHandlers:
                 tags=args.tags,
                 store_content=args.store
             )
-            print(f"✅ Snippet gespeichert (ID: {snippet_id})")
+            print(f"✅ Snippet saved (ID: {snippet_id})")
         except FileNotFoundError as e:
             print(f"❌ {e}")
             sys.exit(1)
@@ -460,10 +444,10 @@ class CommandHandlers:
         )
 
         if not results:
-            print("Keine Snippets gefunden")
+            print("No snippets found")
             return
 
-        print(f"\n📦 Gefunden: {len(results)} Snippets\n")
+        print(f"\n📦 Found: {len(results)} snippets\n")
 
         for snippet in results:
             tags_str = ', '.join(snippet['tags']) if snippet['tags'] else ''
@@ -482,7 +466,7 @@ class CommandHandlers:
         snippet = self.snippets.get(args.name, full_content=args.cat)
 
         if not snippet:
-            print(f"❌ Snippet '{args.name}' nicht gefunden")
+            print(f"❌ Snippet '{args.name}' not found")
             return
 
         print(f"\n📦 Snippet: {snippet['name']}\n")
@@ -517,10 +501,10 @@ class CommandHandlers:
         snippets = self.snippets.list_all()
 
         if not snippets:
-            print("Keine Snippets gefunden")
+            print("No snippets found")
             return
 
-        print(f"\n📦 {len(snippets)} Snippets:\n")
+        print(f"\n📦 {len(snippets)} snippets:\n")
 
         for snippet in snippets:
             print(f"[{snippet['file_type']:12}] {snippet['name']:30} ({snippet['line_count']} lines)")
@@ -533,53 +517,53 @@ class CommandHandlers:
             snippet = self.snippets.get(args.name)
             if snippet:
                 print(f"Snippet: {snippet['name']} ({snippet['file_type']}, {snippet['line_count']} lines)")
-                response = input("Wirklich löschen? (y/n): ")
+                response = input("Really delete? (y/n): ")
                 if response.lower() != 'y':
-                    print("❌ Abgebrochen")
+                    print("❌ Cancelled")
                     return
 
         if self.snippets.delete(args.name):
-            print(f"✅ Snippet '{args.name}' gelöscht")
+            print(f"✅ Snippet '{args.name}' deleted")
         else:
-            print(f"❌ Snippet '{args.name}' nicht gefunden")
+            print(f"❌ Snippet '{args.name}' not found")
 
     # ==================== DELETE COMMANDS ====================
 
     def handle_delete(self, args):
         if not args.force:
-            response = input(f"Eintrag #{args.id} wirklich löschen? (y/N) ")
+            response = input(f"Really delete entry #{args.id}? (y/N) ")
             if response.lower() != 'y':
-                print("Abgebrochen")
+                print("Cancelled")
                 return
 
         if self.actions.delete_entry(args.id):
-            print("✅ Eintrag gelöscht")
+            print("✅ Entry deleted")
         else:
-            print(f"❌ Eintrag #{args.id} nicht gefunden")
+            print(f"❌ Entry #{args.id} not found")
 
     def handle_project_delete(self, args):
         """Handle project-delete command"""
         if not args.force:
-            response = input(f"Projekt '{args.name}' mit ALLEN Daten löschen? (y/N) ")
+            response = input(f"Delete project '{args.name}' with ALL data? (y/N) ")
             if response.lower() != 'y':
-                print("Abgebrochen")
+                print("Cancelled")
                 return
 
         result = self.actions.delete_project(args.name)
 
         if not result:
-            print(f"❌ Projekt '{args.name}' nicht gefunden")
+            print(f"❌ Project '{args.name}' not found")
         else:
-            print("✅ Projekt gelöscht")
+            print("✅ Project deleted")
 
     def handle_related(self, args):
         related = self.actions.get_related_entries(args.id, args.limit)
 
         if not related:
-            print(f"Keine verwandten Einträge für #{args.id} gefunden")
+            print(f"No related entries found for #{args.id}")
             return
 
-        print(f"\n🔗 Verwandte Einträge für #{args.id}:\n")
+        print(f"\n🔗 Related entries for #{args.id}:\n")
 
         for entry in related:
             similarity = f"{entry['similarity_score']:.0%}"
@@ -593,38 +577,38 @@ class CommandHandlers:
     def handle_git_init(self, args):
         """Handle git-init command"""
         if not self.git_integration:
-            print("❌ GitIntegration nicht verfügbar")
+            print("❌ GitIntegration not available")
             return
 
         try:
             if args.global_template:
-                print("🔧 Installiere Git-Hook global...")
-                print("❌ Global installation noch nicht implementiert")
+                print("🔧 Installing Git hook globally...")
+                print("❌ Global installation not yet implemented")
             else:
                 if self.git_integration.install_hook(force=args.force):
-                    print("✅ Git-Hook installiert!")
+                    print("✅ Git hook installed!")
                 else:
-                    print("❌ Installation fehlgeschlagen")
+                    print("❌ Installation failed")
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
 
     def handle_git_info(self, args):
         """Handle git-info command"""
         if not self.git_integration:
-            print("❌ GitIntegration nicht verfügbar")
+            print("❌ GitIntegration not available")
             return
 
         info = self.git_integration.get_git_info()
 
         if not info:
-            print("❌ Kein Git-Repository gefunden")
+            print("❌ No Git repository found")
             return
 
         print(f"\n📚 Git Repository Info:\n")
         print(f"Branch:       {info['branch']}")
         print(f"Last Commit:  {info['last_commit']}")
         print(f"Repo Name:    {info['repo_name']}")
-        print(f"Has Changes:  {'Ja' if info['has_changes'] else 'Nein'}")
+        print(f"Has Changes:  {'Yes' if info['has_changes'] else 'No'}")
         print()
 
     def handle_commit_info(self, args):
@@ -643,10 +627,10 @@ class CommandHandlers:
 
             commits = cursor.fetchall()
             if not commits:
-                print("Keine Commits gefunden")
+                print("No commits found")
                 return
 
-            print(f"\n📚 Letzte {len(commits)} Commits:\n")
+            print(f"\n📚 Last {len(commits)} commits:\n")
             for commit in commits:
                 metadata = json.loads(commit['metadata']) if commit['metadata'] else {}
                 commit_hash = metadata.get('commit_hash', 'unknown')[:8]
@@ -674,12 +658,12 @@ class CommandHandlers:
                 WHERE a.id = ? AND at.name = 'commit'
             """, (args.id,))
         else:
-            print("❌ Bitte --hash, --last oder ID angeben")
+            print("❌ Please specify --hash, --last or ID")
             return
 
         commit = cursor.fetchone()
         if not commit:
-            print("❌ Commit nicht gefunden")
+            print("❌ Commit not found")
             return
 
         metadata = json.loads(commit['metadata']) if commit['metadata'] else {}
@@ -736,10 +720,10 @@ class CommandHandlers:
 
             print(prompt)
         except ImportError as e:
-            print(f"❌ AIPromptManager nicht verfügbar: {e}")
+            print(f"❌ AIPromptManager not available: {e}")
         except Exception as e:
             import traceback
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             traceback.print_exc()
 
     def handle_ai_instruction(self, args):
@@ -749,14 +733,14 @@ class CommandHandlers:
             inst = next((i for i in instructions if i['id'] == args.show), None)
 
             if not inst:
-                print(f"❌ Instruction #{args.show} nicht gefunden")
+                print(f"❌ Instruction #{args.show} not found")
                 return
 
             scope_icon = {'global': '🌍', 'project': '📁', 'session': '⏱️'}.get(inst['scope'], '')
             priority_icon = {'must': '🔴', 'should': '🟡', 'nice': '🟢'}.get(inst['priority'], '')
-            status = "✅ Aktiv" if inst['active'] else "❌ Inaktiv"
+            status = "✅ Active" if inst['active'] else "❌ Inactive"
 
-            print(f"\n🤖 KI-Anweisung #{inst['id']}\n")
+            print(f"\n🤖 AI Instruction #{inst['id']}\n")
             print(f"Status:     {status}")
             print(f"Scope:      {scope_icon} {inst['scope']}")
             print(f"Priority:   {priority_icon} {inst['priority']}")
@@ -775,17 +759,17 @@ class CommandHandlers:
                     if examples.get('bad'):
                         print(f"❌ Bad Example: {examples['bad']}")
                     print()
-                except:
+                except Exception:
                     pass
 
         elif args.list:
             instructions = self.ai_instructions.get(scope='all', project=args.project)
 
             if not instructions:
-                print("Keine Anweisungen gefunden")
+                print("No instructions found")
                 return
 
-            print(f"\n🤖 KI-Anweisungen ({len(instructions)}):\n")
+            print(f"\n🤖 AI Instructions ({len(instructions)}):\n")
 
             for inst in instructions:
                 scope_icon = {'global': '🌍', 'project': '📁', 'session': '⏱️'}.get(inst['scope'], '')
@@ -800,27 +784,27 @@ class CommandHandlers:
             instruction = self.ai_instructions.get_by_id(args.delete)
 
             if not instruction:
-                print(f"❌ Instruction #{args.delete} nicht gefunden")
+                print(f"❌ Instruction #{args.delete} not found")
                 return
 
             if not args.force:
                 preview = instruction['instruction'][:80]
                 try:
                     confirm = input(
-                        f"⚠️  Instruction #{args.delete} wirklich löschen?\n   {preview}\n   Bestätigen mit 'y': "
+                        f"⚠️  Really delete instruction #{args.delete}?\n   {preview}\n   Confirm with 'y': "
                     )
                 except EOFError:
-                    print("❌ Löschung abgebrochen (keine Eingabe möglich)")
+                    print("❌ Deletion cancelled (no input possible)")
                     return
 
                 if confirm.lower() not in ('y', 'yes', 'j', 'ja'):
-                    print("🚫 Löschung abgebrochen")
+                    print("🚫 Deletion cancelled")
                     return
 
             if self.ai_instructions.delete(args.delete):
-                print(f"🗑️  Instruction #{args.delete} gelöscht")
+                print(f"🗑️  Instruction #{args.delete} deleted")
             else:
-                print(f"❌ Löschung von Instruction #{args.delete} fehlgeschlagen")
+                print(f"❌ Deletion of instruction #{args.delete} failed")
 
         elif args.search:
             # Use advanced search with filters
@@ -833,7 +817,7 @@ class CommandHandlers:
             )
 
             if not results:
-                print("Keine Anweisungen gefunden")
+                print("No instructions found")
                 return
 
             # Show applied filters
@@ -848,7 +832,7 @@ class CommandHandlers:
                 filters.append(f"scope={args.search_scope}")
 
             filter_str = " | ".join(filters) if filters else "all"
-            print(f"\n🔍 Gefunden: {len(results)} Anweisungen ({filter_str})\n")
+            print(f"\n🔍 Found: {len(results)} instructions ({filter_str})\n")
 
             for inst in results:
                 # Show category and scope
@@ -862,8 +846,8 @@ class CommandHandlers:
 
         elif args.toggle is not None:
             new_status = self.ai_instructions.toggle(args.toggle)
-            status_str = "aktiviert" if new_status else "deaktiviert"
-            print(f"✅ Anweisung #{args.toggle} {status_str}")
+            status_str = "enabled" if new_status else "disabled"
+            print(f"✅ Instruction #{args.toggle} {status_str}")
 
         elif args.instruction:
             examples = {}
@@ -882,17 +866,17 @@ class CommandHandlers:
                 project=args.project
             )
 
-            print(f"✅ Anweisung gespeichert (ID: {inst_id})")
+            print(f"✅ Instruction saved (ID: {inst_id})")
 
         else:
-            print("❌ Keine Aktion angegeben (--list, --search, --delete, --toggle oder instruction)")
+            print("❌ No action specified (--list, --search, --delete, --toggle or instruction)")
 
     def handle_ai_instruction_update(self, args):
         """Handle ai-instruction-update command"""
         if args.toggle:
             new_status = self.ai_instructions.toggle(args.id)
-            status_text = "aktiviert" if new_status else "deaktiviert"
-            print(f"✅ Anweisung #{args.id} {status_text}")
+            status_text = "enabled" if new_status else "disabled"
+            print(f"✅ Instruction #{args.id} {status_text}")
         else:
             update_kwargs = {}
 
@@ -915,7 +899,7 @@ class CommandHandlers:
                 instruction = self.ai_instructions.get_by_id(args.id)
 
                 if not instruction:
-                    print(f"❌ Instruction #{args.id} nicht gefunden")
+                    print(f"❌ Instruction #{args.id} not found")
                     return
 
                 current_examples = {}
@@ -946,21 +930,21 @@ class CommandHandlers:
                 update_kwargs['clear_examples'] = True
 
             if not update_kwargs:
-                print("❌ Keine Updates angegeben")
+                print("❌ No updates specified")
                 return
 
             if self.ai_instructions.update(args.id, **update_kwargs):
-                print(f"✅ Anweisung #{args.id} aktualisiert")
+                print(f"✅ Instruction #{args.id} updated")
             else:
-                print(f"❌ Update fehlgeschlagen")
+                print(f"❌ Update failed")
 
     # ==================== TODO COMMANDS ====================
 
     def handle_todo(self, args):
         """Handle todo command with subcommands"""
         if not args.todo_command:
-            print("❌ Kein TODO Subcommand angegeben")
-            print("Verfügbare Commands: add, list, done, start, reopen, cancel, delete, show, stats, stale, suggest")
+            print("❌ No TODO subcommand specified")
+            print("Available commands: add, list, done, start, reopen, cancel, delete, show, stats, stale, suggest")
             return
 
         todo_handlers = {
@@ -981,7 +965,7 @@ class CommandHandlers:
         if handler:
             handler(args)
         else:
-            print(f"❌ Unbekanntes TODO Command: {args.todo_command}")
+            print(f"❌ Unknown TODO command: {args.todo_command}")
 
     def handle_todo_add(self, args):
         """Add new TODO"""
@@ -997,21 +981,21 @@ class CommandHandlers:
                 depends_on=args.depends,
                 assigned_to=args.assign
             )
-            print(f"✅ TODO erstellt (ID: {todo_id})")
+            print(f"✅ TODO created (ID: {todo_id})")
 
             # Show priority indicator
             priority_icons = {'high': '🔴', 'normal': '🟡', 'low': '🟢'}
-            print(f"   {priority_icons.get(args.priority, '')} Priorität: {args.priority}")
+            print(f"   {priority_icons.get(args.priority, '')} Priority: {args.priority}")
 
             if args.category:
-                print(f"   📁 Kategorie: {args.category}")
+                print(f"   📁 Category: {args.category}")
             if args.due:
-                print(f"   📅 Fällig: {args.due}")
+                print(f"   📅 Due: {args.due}")
             if args.assign:
-                print(f"   👤 Zugewiesen: {args.assign}")
+                print(f"   👤 Assigned: {args.assign}")
 
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
 
     def handle_todo_list(self, args):
         """List TODOs with filters"""
@@ -1031,11 +1015,11 @@ class CommandHandlers:
         )
 
         if not todos:
-            print("Keine TODOs gefunden")
+            print("No TODOs found")
             return
 
-        scope = "alle Projekte" if args.all_projects else project_filter
-        print(f"\n📋 TODOs ({len(todos)} Einträge | Projekt: {scope}):\n")
+        scope = "all projects" if args.all_projects else project_filter
+        print(f"\n📋 TODOs ({len(todos)} entries | Project: {scope}):\n")
 
         priority_icons = {'high': '🔴', 'normal': '🟡', 'low': '🟢'}
         status_icons = {
@@ -1080,7 +1064,7 @@ class CommandHandlers:
             print(f"✅ Erledigt: {', '.join(map(str, result['success']))}")
 
         if result['failed']:
-            print("\n❌ Fehlgeschlagen:")
+            print("\n❌ Failed:")
             for fail in result['failed']:
                 print(f"   #{fail['id']}: {fail['error']}")
 
@@ -1088,19 +1072,19 @@ class CommandHandlers:
         """Mark TODO as in_progress"""
         try:
             self.todos.update_status(args.id, 'in_progress')
-            print(f"🔄 TODO #{args.id} wird bearbeitet")
+            print(f"🔄 TODO #{args.id} in progress")
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
 
     def handle_todo_reopen(self, args):
         """Reopen completed TODOs"""
         result = self.todos.reopen(args.ids)
 
         if result['success']:
-            print(f"⭕ Wiedereröffnet: {', '.join(map(str, result['success']))}")
+            print(f"⭕ Reopened: {', '.join(map(str, result['success']))}")
 
         if result['failed']:
-            print("\n❌ Fehlgeschlagen:")
+            print("\n❌ Failed:")
             for fail in result['failed']:
                 print(f"   #{fail['id']}: {fail['error']}")
 
@@ -1117,24 +1101,24 @@ class CommandHandlers:
                 failed.append({'id': todo_id, 'error': str(e)})
 
         if success:
-            print(f"❌ Abgebrochen: {', '.join(map(str, success))}")
+            print(f"❌ Cancelled: {', '.join(map(str, success))}")
 
         if failed:
-            print("\n❌ Fehlgeschlagen:")
+            print("\n❌ Failed:")
             for fail in failed:
                 print(f"   #{fail['id']}: {fail['error']}")
 
     def handle_todo_delete(self, args):
         """Delete TODOs permanently"""
         if not args.force:
-            print(f"⚠️  TODOs permanent löschen: {', '.join(map(str, args.ids))}")
-            response = input("Wirklich löschen? (y/n): ")
+            print(f"⚠️  Permanently delete TODOs: {', '.join(map(str, args.ids))}")
+            response = input("Really delete? (y/n): ")
             if response.lower() != 'y':
-                print("Abgebrochen")
+                print("Cancelled")
                 return
 
         deleted = self.todos.delete_todos(args.ids)
-        print(f"🗑️  {deleted} TODO(s) gelöscht")
+        print(f"🗑️  {deleted} TODO(s) deleted")
 
     def handle_todo_show(self, args):
         """Show TODO details"""
@@ -1148,7 +1132,7 @@ class CommandHandlers:
                 break
 
         if not todo:
-            print(f"❌ TODO #{args.id} nicht gefunden")
+            print(f"❌ TODO #{args.id} not found")
             return
 
         # Display details
@@ -1186,35 +1170,35 @@ class CommandHandlers:
         """Show TODO statistics"""
         stats = self.todos.get_todo_stats(project_name=args.project)
 
-        print("\n📊 TODO Statistiken")
+        print("\n📊 TODO Statistics")
         print("=" * 40)
-        print(f"Gesamt: {stats['total']}")
+        print(f"Total: {stats['total']}")
 
         if stats['by_status']:
-            print("\nNach Status:")
+            print("\nBy status:")
             for status, count in stats['by_status'].items():
                 print(f"  {status}: {count}")
 
         if stats['by_priority']:
-            print("\nNach Priorität:")
+            print("\nBy priority:")
             for priority, count in stats['by_priority'].items():
                 print(f"  {priority}: {count}")
 
         if stats['overdue'] > 0:
-            print(f"\n⚠️  Überfällig: {stats['overdue']}")
+            print(f"\n⚠️  Overdue: {stats['overdue']}")
 
     def handle_todo_stale(self, args):
         """Show stale TODOs"""
         stale = self.todos.get_stale_todos(days=args.days)
 
         if not stale:
-            print(f"Keine TODOs älter als {args.days} Tage")
+            print(f"No TODOs older than {args.days} days")
             return
 
-        print(f"\n⏰ Alte TODOs (>{args.days} Tage):\n")
+        print(f"\n⏰ Stale TODOs (>{args.days} days):\n")
 
         for todo in stale:
-            print(f"#{todo['id']} ({todo['days_old']} Tage) - {todo['summary']}")
+            print(f"#{todo['id']} ({todo['days_old']} days) - {todo['summary']}")
             if todo['category']:
                 print(f"   [{todo['category']}]")
             print()
@@ -1227,17 +1211,17 @@ class CommandHandlers:
         )
 
         if not suggestions:
-            print("Keine TODO-Vorschläge gefunden")
+            print("No TODO suggestions found")
             return
 
-        print(f"\n💡 TODO Vorschläge:\n")
+        print(f"\n💡 TODO Suggestions:\n")
 
         for i, suggestion in enumerate(suggestions, 1):
             print(f"{i}. {suggestion['summary']}")
             if suggestion.get('category'):
-                print(f"   Kategorie: {suggestion['category']}")
+                print(f"   Category: {suggestion['category']}")
             if suggestion.get('priority'):
-                print(f"   Priorität: {suggestion['priority']}")
+                print(f"   Priority: {suggestion['priority']}")
             print()
 
     # ========== TEST MANAGEMENT HANDLERS ==========
@@ -1261,13 +1245,13 @@ class CommandHandlers:
         }
 
         if not args.test_command:
-            print("❌ Kein Test-Subcommand angegeben")
-            print("Verfügbar: suite-add, suite-list, suite-update, case-add, case-list, case-update, exec, run-suite, history, stats, failures, flaky, coverage")
+            print("❌ No test subcommand specified")
+            print("Available: suite-add, suite-list, suite-update, case-add, case-list, case-update, exec, run-suite, history, stats, failures, flaky, coverage")
             sys.exit(1)
 
         handler = test_command_map.get(args.test_command)
         if not handler:
-            print(f"❌ Unbekanntes Test-Command: {args.test_command}")
+            print(f"❌ Unknown test command: {args.test_command}")
             sys.exit(1)
 
         handler(args)
@@ -1282,11 +1266,11 @@ class CommandHandlers:
                 description=args.desc,
                 tags=args.tags
             )
-            print(f"✅ Test Suite erstellt: ID {suite_id}")
+            print(f"✅ Test Suite created: ID {suite_id}")
             print(f"   Name: {args.name}")
-            print(f"   Projekt: {project}")
+            print(f"   Project: {project}")
         except ValueError as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def handle_test_suite_list(self, args):
@@ -1297,14 +1281,14 @@ class CommandHandlers:
         )
 
         if not suites:
-            print("Keine Test Suites gefunden")
+            print("No test suites found")
             return
 
         print(f"\n📋 Test Suites ({len(suites)}):\n")
         for suite in suites:
             status = "✅" if suite['active'] else "⏸️"
             print(f"{status} ID {suite['id']}: {suite['name']}")
-            print(f"   Projekt: {suite['project_name']}")
+            print(f"   Project: {suite['project_name']}")
             print(f"   Tests: {suite['test_count']}")
             if suite['description']:
                 print(f"   {suite['description'][:80]}...")
@@ -1323,8 +1307,8 @@ class CommandHandlers:
                 updates['tags'] = args.tags
 
             if not updates:
-                print("❌ Keine Updates angegeben")
-                print("Verfügbare Optionen: --name, --desc, --tags")
+                print("❌ No updates specified")
+                print("Available options: --name, --desc, --tags")
                 sys.exit(1)
 
             success = self.test_manager.update_test_suite(
@@ -1333,14 +1317,14 @@ class CommandHandlers:
             )
 
             if success:
-                print(f"✅ Test Suite {args.suite_id} aktualisiert")
+                print(f"✅ Test Suite {args.suite_id} updated")
                 for key, value in updates.items():
                     print(f"   {key}: {value}")
             else:
-                print(f"❌ Keine Änderungen vorgenommen")
+                print(f"❌ No changes made")
 
         except ValueError as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def handle_test_case_add(self, args):
@@ -1357,13 +1341,13 @@ class CommandHandlers:
                 tags=args.tags,
                 priority=args.priority
             )
-            print(f"✅ Test Case erstellt: ID {test_id}")
+            print(f"✅ Test Case created: ID {test_id}")
             print(f"   Name: {args.name}")
             print(f"   Command: {args.command}")
             print(f"   Timeout: {args.timeout}s")
             print(f"   Expected Exit Code: {args.exit_code}")
         except ValueError as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def handle_test_case_list(self, args):
@@ -1375,7 +1359,7 @@ class CommandHandlers:
         )
 
         if not tests:
-            print("Keine Test Cases gefunden")
+            print("No test cases found")
             return
 
         print(f"\n🧪 Test Cases ({len(tests)}):\n")
@@ -1413,8 +1397,8 @@ class CommandHandlers:
                 updates['tags'] = args.tags
 
             if not updates:
-                print("❌ Keine Updates angegeben")
-                print("Verfügbare Optionen: --name, --command, --desc, --cwd, --timeout, --exit-code, --priority, --tags")
+                print("❌ No updates specified")
+                print("Available options: --name, --command, --desc, --cwd, --timeout, --exit-code, --priority, --tags")
                 sys.exit(1)
 
             success = self.test_manager.update_test_case(
@@ -1423,17 +1407,17 @@ class CommandHandlers:
             )
 
             if success:
-                print(f"✅ Test Case {args.test_case_id} aktualisiert")
+                print(f"✅ Test Case {args.test_case_id} updated")
                 for key, value in updates.items():
                     if key == 'command' and len(str(value)) > 60:
                         print(f"   {key}: {str(value)[:60]}...")
                     else:
                         print(f"   {key}: {value}")
             else:
-                print(f"❌ Keine Änderungen vorgenommen")
+                print(f"❌ No changes made")
 
         except ValueError as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def handle_test_exec(self, args):
@@ -1469,7 +1453,7 @@ class CommandHandlers:
                 print(f"\n⚠️  Error: {result.error_message}")
 
         except ValueError as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def handle_test_run_suite(self, args):
@@ -1482,7 +1466,7 @@ class CommandHandlers:
         )
 
         if not tests:
-            print("Keine aktiven Test Cases in dieser Suite gefunden")
+            print("No active test cases found in this suite")
             return
 
         print(f"🚀 Running {len(tests)} tests...")
@@ -1532,10 +1516,10 @@ class CommandHandlers:
         )
 
         if not history:
-            print("Keine Execution History gefunden")
+            print("No execution history found")
             return
 
-        print(f"\n📊 Execution History (letzte {len(history)}):\n")
+        print(f"\n📊 Execution History (last {len(history)}):\n")
         for entry in history:
             status_icon = {"passed": "✅", "failed": "❌", "timeout": "⏱️", "error": "🚨"}.get(entry['status'], "❓")
             timestamp = datetime.fromtimestamp(entry['executed_at']).strftime('%Y-%m-%d %H:%M:%S')
@@ -1552,10 +1536,10 @@ class CommandHandlers:
                 days=args.days
             )
             if not stats:
-                print("Test Case nicht gefunden")
+                print("Test Case not found")
                 return
 
-            print(f"\n📊 Test Case Statistiken ({args.days} Tage):\n")
+            print(f"\n📊 Test Case Statistics ({args.days} days):\n")
             print(f"Test: {stats['test_case']['name']}")
             print(f"Suite: {stats['test_case']['suite_name']}")
             print(f"\nRuns: {stats['statistics']['total_runs']}")
@@ -1572,12 +1556,12 @@ class CommandHandlers:
             # Suite stats
             stats = self.test_reporter.get_suite_summary(args.suite)
             if not stats:
-                print("Test Suite nicht gefunden")
+                print("Test Suite not found")
                 return
 
-            print(f"\n📊 Test Suite Statistiken:\n")
+            print(f"\n📊 Test Suite Statistics:\n")
             print(f"Suite: {stats['suite']['name']}")
-            print(f"Projekt: {stats['suite']['project_name']}")
+            print(f"Project: {stats['suite']['project_name']}")
             print(f"\nTests:")
             print(f"  Total: {stats['test_counts']['total']}")
             print(f"  Active: {stats['test_counts']['active']}")
@@ -1599,11 +1583,11 @@ class CommandHandlers:
             print(f"  Success Rate: {stats['success_rate_7_days']}%")
         else:
             # No parameters - show usage
-            print("\n❌ Bitte Parameter angeben:")
-            print("  --case <id>      Test Case Statistiken")
-            print("  --suite <id>     Test Suite Statistiken")
+            print("\n❌ Please specify a parameter:")
+            print("  --case <id>      Test Case Statistics")
+            print("  --suite <id>     Test Suite Statistics")
             print("  --project <name> Project Coverage")
-            print("\nBeispiel: cm test stats --project context-manager")
+            print("\nExample: cm test stats --project context-manager")
 
     def handle_test_failures(self, args):
         """Show recent test failures"""
@@ -1613,10 +1597,10 @@ class CommandHandlers:
         )
 
         if not failures:
-            print("✅ Keine Fehler gefunden!")
+            print("✅ No failures found!")
             return
 
-        print(f"\n❌ Letzte Fehler ({len(failures)}):\n")
+        print(f"\n❌ Recent failures ({len(failures)}):\n")
         for failure in failures:
             timestamp = datetime.fromtimestamp(failure['executed_at']).strftime('%Y-%m-%d %H:%M:%S')
             print(f"❌ {timestamp} | {failure['project_name']}/{failure['suite_name']}")
@@ -1634,10 +1618,10 @@ class CommandHandlers:
         )
 
         if not flaky:
-            print("✅ Keine flaky tests gefunden!")
+            print("✅ No flaky tests found!")
             return
 
-        print(f"\n⚠️  Potentiell Flaky Tests ({len(flaky)}):\n")
+        print(f"\n⚠️  Potentially flaky tests ({len(flaky)}):\n")
         for test in flaky:
             print(f"⚠️  {test['project_name']}/{test['suite_name']}/{test['test_name']}")
             print(f"   Runs: {test['total_runs']} | Passed: {test['passed']} | Failed: {test['failed']}")
@@ -1664,8 +1648,8 @@ class CommandHandlers:
     def handle_infra(self, args):
         """Infrastructure management handler"""
         if not args.infra_command:
-            print("❌ Kein Subcommand angegeben")
-            print("Verfügbare: add-host, list-hosts, show-host, edit-host, delete-host,")
+            print("❌ No subcommand specified")
+            print("Available: add-host, list-hosts, show-host, edit-host, delete-host,")
             print("            add-service, list-services, edit-service, delete-service")
             return
 
@@ -1686,7 +1670,7 @@ class CommandHandlers:
         if handler:
             handler(args)
         else:
-            print(f"❌ Unbekanntes Subcommand: {args.infra_command}")
+            print(f"❌ Unknown subcommand: {args.infra_command}")
 
     def _infra_add_host(self, args):
         """Add SSH host"""
@@ -1705,9 +1689,9 @@ class CommandHandlers:
                 tags=args.tags,
                 comment=args.comment
             )
-            print(f"✅ Host '{args.hostname}' hinzugefügt (ID: {host_id})")
+            print(f"✅ Host '{args.hostname}' added (ID: {host_id})")
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def _infra_list_hosts(self, args):
@@ -1721,7 +1705,7 @@ class CommandHandlers:
         )
 
         if not hosts:
-            print("📭 Keine Hosts gefunden")
+            print("📭 No hosts found")
             return
 
         print(f"\n🖥️  SSH Hosts ({len(hosts)})\n")
@@ -1760,7 +1744,7 @@ class CommandHandlers:
         host = self.infrastructure.show_host(args.hostname)
 
         if not host:
-            print(f"❌ Host '{args.hostname}' nicht gefunden")
+            print(f"❌ Host '{args.hostname}' not found")
             return
 
         print(f"\n🖥️  Host: {host['hostname']}\n")
@@ -1821,9 +1805,9 @@ class CommandHandlers:
         )
 
         if updated:
-            print(f"✅ Host '{args.hostname}' aktualisiert")
+            print(f"✅ Host '{args.hostname}' updated")
         else:
-            print(f"❌ Host '{args.hostname}' nicht gefunden oder keine Änderungen")
+            print(f"❌ Host '{args.hostname}' not found or no changes")
 
     def _infra_delete_host(self, args):
         """Delete host"""
@@ -1850,9 +1834,9 @@ class CommandHandlers:
                 tags=args.tags,
                 comment=args.comment
             )
-            print(f"✅ Service '{args.service_name}' auf '{args.hostname}' hinzugefügt (ID: {service_id})")
+            print(f"✅ Service '{args.service_name}' on '{args.hostname}' added (ID: {service_id})")
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def _infra_list_services(self, args):
@@ -1865,7 +1849,7 @@ class CommandHandlers:
         )
 
         if not services:
-            print("📭 Keine Services gefunden")
+            print("📭 No services found")
             return
 
         print(f"\n📦 Services ({len(services)})\n")
@@ -1901,12 +1885,12 @@ class CommandHandlers:
             )
 
             if updated:
-                print(f"✅ Service '{args.service_name}' auf Host '{args.hostname}' aktualisiert")
+                print(f"✅ Service '{args.service_name}' on host '{args.hostname}' updated")
             else:
-                print(f"❌ Service '{args.service_name}' auf Host '{args.hostname}' nicht gefunden oder keine Änderungen")
+                print(f"❌ Service '{args.service_name}' on host '{args.hostname}' not found or no changes")
                 sys.exit(1)
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error: {e}")
             sys.exit(1)
 
     def _infra_delete_service(self, args):
@@ -1939,7 +1923,6 @@ def dispatch_command(args, handlers: CommandHandlers):
         'projects': handlers.handle_projects,
         'vacuum': handlers.handle_vacuum,
         'cleanup': handlers.handle_cleanup,
-        'tokens': handlers.handle_tokens,
         'snippet-add': handlers.handle_snippet_add,
         'snippet-search': handlers.handle_snippet_search,
         'snippet-show': handlers.handle_snippet_show,
@@ -1960,12 +1943,12 @@ def dispatch_command(args, handlers: CommandHandlers):
     }
 
     if not args.command:
-        print("❌ Kein Command angegeben")
+        print("❌ No command specified")
         sys.exit(1)
 
     handler = command_map.get(args.command)
     if not handler:
-        print(f"❌ Unbekanntes Command: {args.command}")
+        print(f"❌ Unknown command: {args.command}")
         sys.exit(1)
 
     handler(args)

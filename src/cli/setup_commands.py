@@ -38,7 +38,7 @@ def cmd_init(args):
         _init_external(config_path)
     else:
         print("❌ Invalid choice.")
-        return
+        sys.exit(1)
 
     # Test connection
     print()
@@ -54,10 +54,11 @@ def cmd_init(args):
             print("✅ Connection successful!")
         else:
             print("❌ Connection test failed.")
+            sys.exit(1)
     except Exception as e:
         print(f"❌ Connection failed: {e}")
         print(f"   Check your config: {config_path}")
-        return
+        sys.exit(1)
 
     print()
     print("🎉 Setup complete!")
@@ -68,33 +69,77 @@ def cmd_init(args):
 
 
 def _init_docker(config_path):
-    """Start PostgreSQL via docker compose and write config."""
+    """Ensure .env exists, start PostgreSQL via docker compose, write CLI config."""
     # Check docker is available
     if not shutil.which('docker'):
         print("❌ Docker not found. Install Docker Desktop first.")
-        return
+        sys.exit(1)
 
-    # Find docker-compose.yml
-    compose_file = Path(__file__).parent.parent.parent / 'docker-compose.yml'
+    project_dir = Path(__file__).parent.parent.parent
+    compose_file = project_dir / 'docker-compose.yml'
+    env_file = project_dir / '.env'
+    env_example = project_dir / '.env.example'
+
     if not compose_file.exists():
         print(f"❌ docker-compose.yml not found at {compose_file}")
-        return
+        sys.exit(1)
+
+    # Ensure .env exists (copy from template, prompt for password)
+    if not env_file.exists():
+        if not env_example.exists():
+            print(f"❌ .env.example missing - cannot create .env")
+            sys.exit(1)
+        print()
+        print("📄 Creating .env from template...")
+        password = input("  Set POSTGRES_PASSWORD: ").strip()
+        if not password:
+            print("❌ Password cannot be empty.")
+            sys.exit(1)
+        env_content = env_example.read_text().replace(
+            'POSTGRES_PASSWORD=change_me_please',
+            f'POSTGRES_PASSWORD={password}'
+        )
+        env_file.write_text(env_content)
+        os.chmod(env_file, 0o600)
+        print(f"✅ Wrote {env_file}")
+
+    # Parse .env for CLI config (so cm and docker use identical credentials)
+    env = _parse_env(env_file)
+    user = env.get('POSTGRES_USER', 'cm_user')
+    password = env.get('POSTGRES_PASSWORD', '')
+    database = env.get('POSTGRES_DB', 'context_manager')
+    port = int(env.get('POSTGRES_PORT', '5432'))
+
+    if not password:
+        print("❌ POSTGRES_PASSWORD is empty in .env")
+        sys.exit(1)
 
     print()
-    print("Starting PostgreSQL + pgvector...")
+    print("Starting PostgreSQL + pgvector (waiting for healthcheck)...")
     result = subprocess.run(
-        ['docker', 'compose', '-f', str(compose_file), 'up', '-d'],
-        capture_output=True, text=True
+        ['docker', 'compose', '-f', str(compose_file), 'up', '-d', '--wait'],
+        capture_output=True, text=True, cwd=str(project_dir)
     )
     if result.returncode != 0:
         print(f"❌ Docker failed: {result.stderr}")
-        return
+        sys.exit(1)
 
-    print("✅ PostgreSQL container started (port 5432)")
+    print(f"✅ PostgreSQL container healthy (port {port})")
 
-    # Write config
-    _write_config(config_path, host='localhost', port=5432,
-                  database='context_manager', user='cm_user', password='changeme')
+    _write_config(config_path, host='localhost', port=port,
+                  database=database, user=user, password=password)
+
+
+def _parse_env(env_file):
+    """Minimal .env parser (KEY=VALUE, ignores comments and blank lines)."""
+    env = {}
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
 
 
 def _init_external(config_path):
@@ -137,10 +182,10 @@ def cmd_doctor(args):
 
     # 1. Python version
     py_version = sys.version_info
-    if py_version >= (3, 10):
+    if py_version >= (3, 12):
         print(f"✅ Python {py_version.major}.{py_version.minor}.{py_version.micro}")
     else:
-        print(f"❌ Python {py_version.major}.{py_version.minor} - need 3.10+")
+        print(f"❌ Python {py_version.major}.{py_version.minor} - need 3.12+")
         issues += 1
 
     # 2. uv

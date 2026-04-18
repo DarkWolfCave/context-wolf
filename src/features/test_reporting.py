@@ -1,5 +1,5 @@
 """
-Test Reporting Feature for Context Manager V3
+Test Reporting Feature for ContextWolf
 Provides statistics, summaries, and reports for test executions
 
 Features:

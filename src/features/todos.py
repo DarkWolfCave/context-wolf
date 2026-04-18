@@ -1,5 +1,5 @@
 """
-TODO Management System for Context Manager V3
+TODO Management System for ContextWolf
 Handles TODO lifecycle: create, list, update status, bulk operations
 
 Features:

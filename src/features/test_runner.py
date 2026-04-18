@@ -1,5 +1,5 @@
 """
-Test Runner Feature for Context Manager V3
+Test Runner Feature for ContextWolf
 Handles test execution, result tracking, and reporting
 
 Features:

@@ -35,7 +35,7 @@ The setup script runs 5 steps:
 1. Installs **uv** (if not present) and all dependencies
 2. Walks you through **database configuration** (Docker or external PostgreSQL)
 3. Configures **Claude Code MCP integration**
-4. Optionally sets up **Semantic Search** (ONNX embeddings, ~200MB)
+4. Optionally sets up **Semantic Search** (ONNX embeddings, ~90 MB)
 5. Runs **diagnostics** to verify everything works
 
 After setup completes, restart Claude Code. ContextWolf tools are available in every new session.
@@ -53,23 +53,30 @@ uv sync --extra all            # All features (MCP + embeddings + dev)
 # uv sync --extra mcp          # MCP server only
 # uv sync --extra embeddings   # Semantic search only
 
-# 2. Configure database (interactive wizard)
+# 2. Start PostgreSQL
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD
+docker compose up -d
+
+# 3. Configure CLI (reads .env, writes ~/.context/config.yaml)
 cm init
 
-# 3. Register MCP server with Claude Code
+# 4. Register MCP server with Claude Code
 cm setup-mcp
 
-# 4. Verify installation
+# 5. Verify installation
 cm doctor
 ```
 
 ### Database via Docker
 
 ```bash
+cp .env.example .env
+# Edit .env: set POSTGRES_PASSWORD, optionally change POSTGRES_PORT
 docker compose up -d
 ```
 
-This starts PostgreSQL with pgvector, bound to `127.0.0.1:5432` (localhost only). The `cm init` wizard can auto-detect this.
+This starts PostgreSQL with pgvector on the port configured in `.env` (default 5432). Data is stored in `./data/postgres/` (bind mount, gitignored). The `cm init` wizard reads the same `.env` so CLI and Docker use identical credentials.
 
 For PostgreSQL on a separate server (NAS, Raspberry Pi), see the [README](../README.md#database-on-a-separate-server).
 
@@ -197,9 +204,14 @@ The CLI offers 60+ commands - more than the 31 MCP tools. Some operations (like 
 
 ## Configuration
 
-ContextWolf stores its configuration in `~/.context/config.yaml`. Created automatically by `cm init`.
+ContextWolf uses two files with identical database credentials:
 
-### Key settings
+- **`.env`** in the repo - used by Docker Compose
+- **`~/.context/config.yaml`** - used by the CLI and MCP server
+
+`cm init` reads `.env` and writes `config.yaml` so both stay in sync.
+
+### config.yaml
 
 ```yaml
 database:
@@ -209,14 +221,26 @@ database:
     port: 5432
     database: context_manager
     user: cm_user
-    password: changeme
+    password: your_password_here
 ```
 
-Environment variables (`POSTGRES_HOST`, `POSTGRES_PORT`, etc.) override YAML settings.
+Environment variables (`POSTGRES_HOST`, `POSTGRES_PORT`, etc.) override YAML settings at runtime.
+
+### .env
+
+```bash
+POSTGRES_USER=cm_user
+POSTGRES_PASSWORD=your_password_here
+POSTGRES_DB=context_manager
+POSTGRES_PORT=5432
+TZ=Europe/Berlin
+```
+
+Changed the password? Update both files, then `docker compose restart postgres`.
 
 ### Semantic Search (optional)
 
-Semantic search uses a local ONNX embedding model (`all-MiniLM-L6-v2`, 86MB) to find conceptually similar entries. Search for "authentication" and find entries about "JWT", "login", or "OAuth".
+Semantic search uses a local ONNX embedding model (`all-MiniLM-L6-v2`, ~90 MB) to find conceptually similar entries. Search for "authentication" and find entries about "JWT", "login", or "OAuth".
 
 ```bash
 # Process all unembedded entries

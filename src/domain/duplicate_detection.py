@@ -27,7 +27,7 @@ class DuplicateDetectionManager:
     Architecture: Domain Layer
     """
 
-    # Konfigurierbare Schwellenwerte
+    # Configurable thresholds
     THRESHOLDS = {
         "exact_duplicate": {
             "min_similarity": 0.95,
@@ -44,13 +44,13 @@ class DuplicateDetectionManager:
         "related_content": {
             "min_similarity": 0.70,
             "same_project": True,
-            "time_window_hours": 168,  # 7 Tage
+            "time_window_hours": 168,  # 7 days
             "action": "link"
         },
         "cross_reference": {
             "min_similarity": 0.75,
             "same_project": False,
-            "time_window_hours": None,  # Zeitunabhängig
+            "time_window_hours": None,  # Time-independent
             "action": "note"
         }
     }
@@ -63,16 +63,16 @@ class DuplicateDetectionManager:
             conn: Database connection (with row_factory for dict-like access)
         """
         self.conn = conn
-        self.similarity_cache = {}  # Cache für Performance
+        self.similarity_cache = {}  # Cache for performance
 
     def calculate_similarity(self, text1: str, text2: str) -> float:
-        """Berechne Ähnlichkeit zwischen zwei Texten"""
-        # Cache-Key für Performance
+        """Calculate similarity between two texts"""
+        # Cache key for performance
         cache_key = hash(text1) ^ hash(text2)
         if cache_key in self.similarity_cache:
             return self.similarity_cache[cache_key]
 
-        # Normalisierung für besseren Vergleich
+        # Normalize for better comparison
         # Handle None values
         if not text1 or not text2:
             return 0.0
@@ -80,10 +80,10 @@ class DuplicateDetectionManager:
         text1 = text1.lower().strip()
         text2 = text2.lower().strip()
 
-        # difflib SequenceMatcher für Ähnlichkeit
+        # difflib SequenceMatcher for similarity
         similarity = difflib.SequenceMatcher(None, text1, text2).ratio()
 
-        # Cache für 100 letzte Vergleiche
+        # Cache last 100 comparisons
         if len(self.similarity_cache) > 100:
             self.similarity_cache.clear()
         self.similarity_cache[cache_key] = similarity
@@ -92,10 +92,10 @@ class DuplicateDetectionManager:
 
     def find_similar_entries(self, content: str, project: str = None,
                             limit: int = 10) -> List[Dict]:
-        """Finde ähnliche Einträge in der Datenbank"""
+        """Find similar entries in the database"""
         cursor = self.conn.cursor()
 
-        # Query für letzte Einträge (mit oder ohne Projekt-Filter)
+        # Query for recent entries (with or without project filter)
         if project:
             query = """
                 SELECT
@@ -136,7 +136,7 @@ class DuplicateDetectionManager:
         current_time = datetime.now()
 
         for row in cursor.fetchall():
-            # Ähnlichkeit berechnen
+            # Calculate similarity
             similarity = self.calculate_similarity(content, row['content'])
 
             if similarity < 0.5:  # Unter 50% ignorieren
@@ -164,17 +164,17 @@ class DuplicateDetectionManager:
                 'time_ago': self._format_time_ago(time_diff)
             })
 
-        # Sortiere nach Ähnlichkeit
+        # Sort by similarity
         similar_entries.sort(key=lambda x: x['similarity'], reverse=True)
 
         return similar_entries[:limit]
 
     def _categorize_similarity(self, similarity: float, same_project: bool,
                                hours_diff: float) -> str:
-        """Kategorisiere die Art der Ähnlichkeit"""
+        """Categorize the type of similarity"""
         for category, rules in self.THRESHOLDS.items():
             if similarity >= rules['min_similarity']:
-                # Projekt-Check
+                # Project check
                 if rules['same_project'] is not None:
                     if rules['same_project'] != same_project:
                         continue
@@ -193,19 +193,19 @@ class DuplicateDetectionManager:
         total_seconds = int(time_diff.total_seconds())
 
         if total_seconds < 60:
-            return "gerade eben"
+            return "just now"
         elif total_seconds < 3600:
             minutes = total_seconds // 60
-            return f"vor {minutes} Minute{'n' if minutes != 1 else ''}"
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
         elif total_seconds < 86400:
             hours = total_seconds // 3600
-            return f"vor {hours} Stunde{'n' if hours != 1 else ''}"
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
         else:
             days = total_seconds // 86400
-            return f"vor {days} Tag{'en' if days != 1 else ''}"
+            return f"{days} day{'s' if days != 1 else ''} ago"
 
     def check_for_duplicates(self, content: str, project: str = None) -> Dict:
-        """Hauptfunktion: Prüfe auf Duplikate und gebe Empfehlung"""
+        """Main function: check for duplicates and return recommendation"""
         similar = self.find_similar_entries(content, project, limit=5)
 
         result = {
@@ -219,23 +219,23 @@ class DuplicateDetectionManager:
         if not similar:
             return result
 
-        # Prüfe auf exakte Duplikate
+        # Check for exact duplicates
         for entry in similar:
             if entry['category'] == 'exact_duplicate':
                 result['has_duplicates'] = True
                 result['should_warn'] = True
                 result['exact_match'] = entry
-                result['recommendation'] = f"⚠️ Fast identischer Eintrag gefunden (#{entry['id']} - {entry['time_ago']})"
+                result['recommendation'] = f"⚠️ Nearly identical entry found (#{entry['id']} - {entry['time_ago']})"
                 break
             elif entry['category'] == 'likely_duplicate':
                 result['should_warn'] = True
-                result['recommendation'] = f"📎 Sehr ähnlicher Eintrag: #{entry['id']} ({entry['similarity']:.0%} Match - {entry['time_ago']})"
+                result['recommendation'] = f"📎 Very similar entry: #{entry['id']} ({entry['similarity']:.0%} Match - {entry['time_ago']})"
                 break
 
         return result
 
     def create_relations_table(self):
-        """Erstelle Tabelle für Beziehungen zwischen Einträgen"""
+        """Create relations table between entries"""
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS entry_relations (
@@ -251,7 +251,7 @@ class DuplicateDetectionManager:
             )
         """)
 
-        # Index für Performance
+        # Index for performance
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_relations_source
             ON entry_relations(source_id)
@@ -266,7 +266,7 @@ class DuplicateDetectionManager:
 
     def save_relation(self, source_id: int, target_id: int,
                      similarity: float, relation_type: str):
-        """Speichere Beziehung zwischen zwei Einträgen"""
+        """Save relation between two entries"""
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO entry_relations
@@ -279,7 +279,7 @@ class DuplicateDetectionManager:
         self.conn.commit()
 
     def get_related_entries(self, entry_id: int) -> List[Dict]:
-        """Hole alle verwandten Einträge"""
+        """Get all related entries"""
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT

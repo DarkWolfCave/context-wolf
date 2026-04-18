@@ -1,6 +1,5 @@
 """
 ContextWolf - Main Entry Point
-Clean modular architecture following 2025 best practices.
 
 Usage:
     python3 -m src save "Implemented feature X"
@@ -55,10 +54,10 @@ def main():
         dispatch_command(args, handlers)
 
     except KeyboardInterrupt:
-        print("\n\n⚠️  Abgebrochen")
+        print("\n\n⚠️  Aborted")
         sys.exit(130)
     except Exception as e:
-        print(f"\n❌ Fehler: {e}")
+        print(f"\n❌ Error: {e}")
         if '--debug' in sys.argv:
             raise
         sys.exit(1)

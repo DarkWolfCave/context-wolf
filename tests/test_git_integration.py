@@ -90,7 +90,7 @@ class TestGitIntegration(unittest.TestCase):
         # Verify hook content
         content = hook_path.read_text()
         self.assertIn(GitIntegration.HOOK_MARKER, content)
-        self.assertIn('context_manager.py', content)
+        self.assertIn('cm save', content)
         self.assertIn(f"# Hook Version: {GitIntegration.HOOK_VERSION}", content)
 
     def test_hook_already_installed(self):
@@ -114,10 +114,9 @@ class TestGitIntegration(unittest.TestCase):
         self.assertIn('#!/bin/bash', content)
         self.assertIn(GitIntegration.HOOK_MARKER, content)
         self.assertIn(f"# Hook Version: {GitIntegration.HOOK_VERSION}", content)
-        self.assertIn('python3 <<\'PY\'', content)
-        self.assertIn('export CM_CONTEXT_MANAGER_PATH', content)
-        self.assertIn('export CM_MESSAGE', content)
-        self.assertIn('with open(os.devnull, "wb") as devnull', content)
+        self.assertIn('cm save', content)
+        self.assertIn('--type commit', content)
+        self.assertIn('exit 0', content)
 
     def test_different_branch(self):
         """Test git info on different branch"""

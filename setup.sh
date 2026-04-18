@@ -154,9 +154,9 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
 fi
 echo ""
 
-# Step 4: Semantic search (optional, ~200MB download)
+# Step 4: Semantic search (optional, ~90 MB download)
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-read -p "🧠 Enable semantic search? Downloads ~200MB ONNX model + installs timer (y/N) " -n 1 -r
+read -p "🧠 Enable semantic search? Downloads ~90 MB ONNX model + installs timer (y/N) " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     "$SCRIPT_DIR/.venv/bin/cm-embed" setup

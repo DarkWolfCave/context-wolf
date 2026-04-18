@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [
-    { name = "darkwolf" },
+    { name = "Peter Bernau", email = "info@darkwolfcave.de" },
 ]
 keywords = ["mcp", "claude", "context", "knowledge-management", "cli"]
 classifiers = [

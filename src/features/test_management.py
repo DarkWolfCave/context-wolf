@@ -1,5 +1,5 @@
 """
-Test Management Feature for Context Manager V3
+Test Management Feature for ContextWolf
 Handles test suites, test cases, and test organization
 
 Features:

@@ -1,5 +1,5 @@
 """
-Notes Management for Context Manager V4
+Notes Management for ContextWolf
 Handles project-linked Markdown notes for session knowledge persistence.
 
 Replaces external tools like Obsidian for storing session context,

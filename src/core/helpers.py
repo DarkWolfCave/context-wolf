@@ -1,8 +1,6 @@
 """
-Helper Utilities for Context Manager V3
+Helper Utilities for ContextWolf
 Compression, validation, and common utilities.
-
-Security: Input validation following 2025 best practices
 """
 
 import re
@@ -60,12 +58,7 @@ class ContentCompressor:
 
 class InputValidator:
     """
-    Input validation to prevent injection attacks and ensure data integrity.
-
-    Following 2025 security best practices:
-    - Whitelist-based validation
-    - Length limits
-    - Type checking
+    Input validation with whitelists, length limits, and type checks.
     """
 
     MAX_PROJECT_NAME_LENGTH = 100
