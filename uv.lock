@@ -133,6 +133,7 @@ wheels = [
 name = "context-wolf"
 source = { editable = "." }
 dependencies = [
+    { name = "mcp" },
     { name = "psycopg2-binary" },
     { name = "pyyaml" },
 ]
@@ -140,7 +141,6 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "huggingface-hub" },
-    { name = "mcp" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pytest" },
@@ -157,16 +157,12 @@ embeddings = [
     { name = "onnxruntime" },
     { name = "tokenizers" },
 ]
-mcp = [
-    { name = "mcp" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = "~=1.9" },
     { name = "huggingface-hub", marker = "extra == 'embeddings'", specifier = "~=1.9" },
-    { name = "mcp", marker = "extra == 'all'", specifier = "~=1.0" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = "~=1.0" },
+    { name = "mcp", specifier = "~=1.0" },
     { name = "numpy", marker = "extra == 'all'", specifier = "~=2.0" },
     { name = "numpy", marker = "extra == 'embeddings'", specifier = "~=2.0" },
     { name = "onnxruntime", marker = "extra == 'all'", specifier = "~=1.20" },
@@ -180,7 +176,7 @@ requires-dist = [
     { name = "tokenizers", marker = "extra == 'all'", specifier = "~=0.21" },
     { name = "tokenizers", marker = "extra == 'embeddings'", specifier = "~=0.21" },
 ]
-provides-extras = ["all", "dev", "embeddings", "mcp"]
+provides-extras = ["all", "dev", "embeddings"]
 
 [[package]]
 name = "coverage"

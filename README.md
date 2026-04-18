@@ -96,8 +96,7 @@ That's it. The setup script will:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies (pick what you need)
-uv sync                        # Core CLI only
-uv sync --extra mcp            # + MCP server for Claude Code
+uv sync                        # Core CLI + MCP server for Claude Code
 uv sync --extra embeddings     # + Semantic search (ONNX, ~90 MB)
 uv sync --extra all            # Everything
 
@@ -262,7 +261,7 @@ Dependencies flow inward only.
 | Command | Description | Requires |
 |---------|-------------|----------|
 | `cm` | CLI tool | Core |
-| `cm-mcp` | MCP server (stdio) | `[mcp]` extra |
+| `cm-mcp` | MCP server (stdio) | Core |
 | `cm-embed` | Embedding worker | `[embeddings]` extra |
 
 ## Documentation

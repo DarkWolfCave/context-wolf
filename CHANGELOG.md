@@ -2,6 +2,22 @@
 
 All notable changes to ContextWolf will be documented in this file.
 
+## [5.0.2] - 2026-04-19
+
+Dependency fix to prevent broken `cm-mcp` installs.
+
+### Fixed
+- `mcp` package moved from `[project.optional-dependencies.mcp]` to core
+  `dependencies`. The `cm-mcp` entry point is always registered, so a
+  plain `uv sync` (without `--extra mcp`) would otherwise uninstall
+  `mcp`/`pydantic` and break the MCP server with
+  `ModuleNotFoundError: No module named 'pydantic'`.
+
+### Changed
+- Install instructions in README and USER_GUIDE simplified: `uv sync`
+  now installs everything needed for both CLI and MCP server. Only
+  `--extra embeddings` / `--extra all` remain as opt-in extras.
+
 ## [5.0.1] - 2026-04-18
 
 English translation, improved Docker setup, documentation, and stability fixes.

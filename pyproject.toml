@@ -28,12 +28,10 @@ classifiers = [
 dependencies = [
     "PyYAML ~=6.0",
     "psycopg2-binary ~=2.9",
+    "mcp ~=1.0",
 ]
 
 [project.optional-dependencies]
-mcp = [
-    "mcp ~=1.0",
-]
 embeddings = [
     "onnxruntime ~=1.20",
     "tokenizers ~=0.21",
@@ -46,7 +44,7 @@ dev = [
 ]
 # Install everything: pip install ".[all]"
 all = [
-    "context-wolf[mcp,embeddings,dev]",
+    "context-wolf[embeddings,dev]",
 ]
 
 [project.scripts]

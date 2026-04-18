@@ -48,10 +48,10 @@ For those who prefer step-by-step control:
 
 ```bash
 # 1. Install dependencies
-uv sync --extra all            # All features (MCP + embeddings + dev)
+uv sync --extra all            # All features (embeddings + dev)
 # Or pick what you need:
-# uv sync --extra mcp          # MCP server only
-# uv sync --extra embeddings   # Semantic search only
+# uv sync                      # Core CLI + MCP server
+# uv sync --extra embeddings   # + Semantic search
 
 # 2. Start PostgreSQL
 cp .env.example .env
@@ -259,7 +259,7 @@ For automatic updates, set up a cron job using `embedding_worker/cron_embed.sh`.
 | Command | Description | Install extra |
 |---|---|---|
 | `cm` | CLI tool (33+ commands) | Core (no extra needed) |
-| `cm-mcp` | MCP server for Claude Code | `uv sync --extra mcp` |
+| `cm-mcp` | MCP server for Claude Code | Core (no extra needed) |
 | `cm-embed` | Embedding worker for semantic search | `uv sync --extra embeddings` |
 
 ---

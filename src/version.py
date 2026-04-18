@@ -12,4 +12,4 @@ V4.3.0: MCP Tool Usage Tracking & Analytics
 V5.0.0: Rebranded to ContextWolf, Python Package (pyproject.toml), SQLite removal, uv support
 """
 
-__version__ = "5.0.1"
+__version__ = "5.0.2"
