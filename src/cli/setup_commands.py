@@ -174,6 +174,89 @@ def _write_config(config_path, host, port, database, user, password):
     print(f"✅ Config written: {config_path} (mode 600)")
 
 
+def _check_embedding_worker_health():
+    """Inspect embedding_worker_runs table and report worker status."""
+    import time
+    try:
+        from src.core.config import Config
+        from src.core.database import Database
+        db = Database(config=Config())
+    except Exception:
+        # PostgreSQL already reported as failing; nothing more to add
+        return
+
+    # Does the table exist? (Migration 006 may not be applied on old installs)
+    try:
+        row = db.fetchone("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = 'embedding_worker_runs'
+        """)
+        if not row:
+            print("⚠️  Embedding worker: no run history yet (table missing or never run)")
+            db.close()
+            return
+    except Exception:
+        db.close()
+        return
+
+    # Coverage
+    try:
+        row = db.fetchone("""
+            SELECT
+                count(*) AS total,
+                count(embedding) AS embedded
+            FROM actions
+        """)
+        if row and row['total'] > 0:
+            pct = 100.0 * row['embedded'] / row['total']
+            mark = "✅" if pct >= 95 else "⚠️"
+            print(f"{mark} Embedding coverage: {pct:.1f}% ({row['embedded']}/{row['total']})")
+    except Exception:
+        pass
+
+    # Last successful run
+    try:
+        row = db.fetchone("""
+            SELECT
+                ran_at,
+                EXTRACT(EPOCH FROM NOW())::BIGINT - ran_at AS seconds_since
+            FROM embedding_worker_runs
+            WHERE success = true
+            ORDER BY ran_at DESC
+            LIMIT 1
+        """)
+        if row:
+            hours = row['seconds_since'] // 3600
+            if hours < 24:
+                print(f"✅ Embedding worker: last success {hours}h ago")
+            elif hours < 48:
+                print(f"⚠️  Embedding worker: last success {hours}h ago (getting stale)")
+            else:
+                print(f"❌ Embedding worker: last success {hours}h ago - likely broken")
+                print("   Fix: uv sync --extra embeddings")
+        else:
+            print("⚠️  Embedding worker: no successful run yet")
+    except Exception:
+        pass
+
+    # Recent failures (last 24h)
+    try:
+        row = db.fetchone("""
+            SELECT count(*) AS fails, MAX(error_message) AS last_err
+            FROM embedding_worker_runs
+            WHERE success = false
+              AND ran_at > EXTRACT(EPOCH FROM NOW() - INTERVAL '24 hours')::BIGINT
+        """)
+        if row and row['fails'] > 0:
+            print(f"❌ Embedding worker: {row['fails']} failure(s) in the last 24h")
+            if row.get('last_err'):
+                print(f"   Latest error: {row['last_err'][:100]}")
+    except Exception:
+        pass
+
+    db.close()
+
+
 def cmd_doctor(args):
     """Check prerequisites and system health."""
     print("🩺 ContextWolf - Doctor")
@@ -263,6 +346,9 @@ def cmd_doctor(args):
         print(f"✅ Embedding model: {size_mb:.0f}MB")
     else:
         print("⚠️  Embedding model not downloaded (semantic search won't work)")
+
+    # 9. Embedding worker health
+    _check_embedding_worker_health()
 
     # Summary
     print()

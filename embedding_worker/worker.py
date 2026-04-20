@@ -147,71 +147,120 @@ def cmd_embed(args):
     print(json.dumps(vector))
 
 
+def _record_run(conn, success: bool, processed: int, duration_ms: int, error: str = None):
+    """Insert a row into embedding_worker_runs and trim entries older than 30 days.
+
+    Safe to call even if the table doesn't exist yet (old installs without
+    migration 006) - logs once and moves on.
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO embedding_worker_runs
+                (success, processed_count, duration_ms, error_message)
+            VALUES (%s, %s, %s, %s)
+        """, (success, processed, duration_ms, error))
+        cursor.execute("""
+            DELETE FROM embedding_worker_runs
+            WHERE ran_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::BIGINT
+        """)
+        conn.commit()
+    except Exception as e:
+        # Non-fatal: worker run succeeded even if we can't log it
+        print(f"Warning: could not record worker run: {e}", file=sys.stderr)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
 def cmd_batch(args):
     """Batch-embed all entries without embeddings."""
-    model = EmbeddingModel()
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    start_time = time.time()
+    processed = 0
+    error_msg = None
 
-    # Count work
-    cursor.execute("SELECT count(*) as cnt FROM actions WHERE embedding IS NULL")
-    total = cursor.fetchone()["cnt"]
+    try:
+        model = EmbeddingModel()
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    if total == 0:
-        print("All entries already have embeddings.")
-        return
+        # Count work
+        cursor.execute("SELECT count(*) as cnt FROM actions WHERE embedding IS NULL")
+        total = cursor.fetchone()["cnt"]
+
+        if total == 0:
+            print("All entries already have embeddings.")
+            _record_run(conn, True, 0, int((time.time() - start_time) * 1000))
+            return
+    except Exception as e:
+        # Failure before we even have a connection - log via fresh connection
+        error_msg = f"{type(e).__name__}: {e}"
+        duration = int((time.time() - start_time) * 1000)
+        try:
+            conn2 = get_db_connection()
+            _record_run(conn2, False, 0, duration, error_msg)
+            conn2.close()
+        except Exception:
+            pass
+        raise
 
     print(f"Entries without embeddings: {total}")
     limit = args.limit or total
-    processed = 0
-    start_time = time.time()
 
-    while processed < limit:
-        batch_limit = min(BATCH_SIZE, limit - processed)
-        cursor.execute("""
-            SELECT a.id, a.summary, ac.content
-            FROM actions a
-            LEFT JOIN action_content ac ON a.id = ac.action_id
-            WHERE a.embedding IS NULL
-            ORDER BY a.id
-            LIMIT %s
-        """, (batch_limit,))
+    try:
+        while processed < limit:
+            batch_limit = min(BATCH_SIZE, limit - processed)
+            cursor.execute("""
+                SELECT a.id, a.summary, ac.content
+                FROM actions a
+                LEFT JOIN action_content ac ON a.id = ac.action_id
+                WHERE a.embedding IS NULL
+                ORDER BY a.id
+                LIMIT %s
+            """, (batch_limit,))
 
-        rows = cursor.fetchall()
-        if not rows:
-            break
+            rows = cursor.fetchall()
+            if not rows:
+                break
 
-        # Prepare texts: use content if available, fallback to summary
-        texts = []
-        ids = []
-        for row in rows:
-            text = row.get("content") or row.get("summary") or ""
-            # Truncate very long texts (tokenizer handles the rest)
-            text = text[:2000]
-            texts.append(text)
-            ids.append(row["id"])
+            # Prepare texts: use content if available, fallback to summary
+            texts = []
+            ids = []
+            for row in rows:
+                text = row.get("content") or row.get("summary") or ""
+                # Truncate very long texts (tokenizer handles the rest)
+                text = text[:2000]
+                texts.append(text)
+                ids.append(row["id"])
 
-        # Generate embeddings
-        vectors = model.embed_batch(texts)
+            # Generate embeddings
+            vectors = model.embed_batch(texts)
 
-        # Write to DB
-        for entry_id, vector in zip(ids, vectors):
-            vector_str = "[" + ",".join(f"{v:.6f}" for v in vector) + "]"
-            cursor.execute(
-                "UPDATE actions SET embedding = %s::vector WHERE id = %s",
-                (vector_str, entry_id)
-            )
+            # Write to DB
+            for entry_id, vector in zip(ids, vectors):
+                vector_str = "[" + ",".join(f"{v:.6f}" for v in vector) + "]"
+                cursor.execute(
+                    "UPDATE actions SET embedding = %s::vector WHERE id = %s",
+                    (vector_str, entry_id)
+                )
 
-        conn.commit()
-        processed += len(rows)
+            conn.commit()
+            processed += len(rows)
+
+            elapsed = time.time() - start_time
+            rate = processed / elapsed if elapsed > 0 else 0
+            eta = (limit - processed) / rate if rate > 0 else 0
+            print(f"  {processed}/{limit} ({rate:.0f}/s, ETA {eta:.0f}s)")
 
         elapsed = time.time() - start_time
-        rate = processed / elapsed if elapsed > 0 else 0
-        eta = (limit - processed) / rate if rate > 0 else 0
-        print(f"  {processed}/{limit} ({rate:.0f}/s, ETA {eta:.0f}s)")
-
-    elapsed = time.time() - start_time
-    print(f"\nDone: {processed} entries in {elapsed:.1f}s ({processed/elapsed:.0f}/s)")
+        print(f"\nDone: {processed} entries in {elapsed:.1f}s ({processed/elapsed:.0f}/s)")
+        _record_run(conn, True, processed, int(elapsed * 1000))
+    except Exception as e:
+        elapsed = time.time() - start_time
+        error_msg = f"{type(e).__name__}: {e}"
+        _record_run(conn, False, processed, int(elapsed * 1000), error_msg)
+        raise
 
 
 def cmd_stats(args):

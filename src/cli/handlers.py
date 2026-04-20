@@ -115,6 +115,15 @@ class CommandHandlers:
                 except Exception:
                     pass
 
+            # Warn once per day if the embedding worker looks stale
+            try:
+                from ..core.embedding_health import check_and_mark_warned
+                stale_msg = check_and_mark_warned(self.db)
+                if stale_msg:
+                    print(f"⚠️  {stale_msg}")
+            except Exception:
+                pass
+
     def handle_index(self, args):
         count = self.indexing.index_md_files(args.directory)
         print(f"\n✅ {count} MD files indexed")

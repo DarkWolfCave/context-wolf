@@ -2,6 +2,35 @@
 
 All notable changes to ContextWolf will be documented in this file.
 
+## [5.0.4] - 2026-04-20
+
+Embedding worker health monitoring - failures become visible without manual log-tailing.
+
+### Added
+- Migration 006: new `embedding_worker_runs` table. Every worker invocation
+  records success/failure, duration, and processed count. Retention is
+  30 days, trimmed by the worker itself after each successful batch.
+- `cron_embed.sh` now fires a desktop notification on failure (macOS
+  `osascript`, Linux `notify-send`), deduplicated to once per calendar
+  day so the user notices the problem without spam.
+- `cm save` and the `context_save` MCP tool emit a one-time-per-day
+  warning when the worker's latest successful run is older than 48h.
+  Claude Code surfaces the MCP variant to the user automatically.
+- `cm doctor` reports embedding coverage percentage, last successful
+  run age, and failure count from the last 24h. Stale workers show a
+  clear fix command (`uv sync --extra embeddings`).
+
+### Fixed
+- The embedding worker previously failed silently when `numpy` /
+  `onnxruntime` were missing (e.g., after `uv sync` without `--extra
+  embeddings`). Failures now surface via notifications, DB records,
+  and user-facing warnings on the next save.
+
+### Internal
+- `src/core/embedding_health.py`: shared stale-detection helper used
+  by both the CLI and the MCP server. Tolerant of missing tables on
+  older installs (migration 006 not applied yet).
+
 ## [5.0.3] - 2026-04-20
 
 Pinned items (GUI feature integration) and schema hardening.

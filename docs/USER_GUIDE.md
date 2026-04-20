@@ -138,6 +138,27 @@ When saving, ContextWolf checks for entries with 85%+ similarity and warns you. 
 
 The optional GUI [context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui) lets you pin specific notes, snippets, actions, or AI instructions for quick session startup. From the CLI you can read the curated list with `cm pinned` (with optional `--project` filter and `--json` output). If the GUI is not installed, `cm pinned` silently returns an empty list - no errors.
 
+### Embedding Worker Health
+
+ContextWolf ships a background embedding worker (`cm-embed`) that runs every 10 minutes via launchd (macOS) or cron (Linux) and embeds new entries for semantic search.
+
+The worker is self-monitoring:
+
+- **Every run** is recorded in the `embedding_worker_runs` table (30-day retention).
+- **On failure** a desktop notification fires (macOS osascript / Linux notify-send) so you see the problem without tailing logs. Notifications are deduplicated to once per day per failure type.
+- **When the latest successful run is > 48h old**, the next `cm save` or MCP `context_save` emits a one-time warning that day.
+- **`cm doctor`** shows coverage percent, last successful run, and failure count from the last 24h.
+
+**If `cm doctor` flags the worker as stale:**
+
+```bash
+# Usually this is all it takes:
+uv sync --extra embeddings
+
+# Then embed any backlog:
+cm-embed batch
+```
+
 ### Git Integration
 
 ContextWolf can automatically track your commits via a post-commit hook. This is **not** set up automatically - you need to install the hook per repository:

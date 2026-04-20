@@ -187,7 +187,18 @@ def context_save(
         action_type=type,
         project=actual_project,
     )
-    return f"{no_project_warning}Saved as action #{action_id}"
+
+    stale_warning = ""
+    try:
+        from src.core.embedding_health import check_and_mark_warned
+        db = get_mgr(ctx, "db")
+        msg = check_and_mark_warned(db)
+        if msg:
+            stale_warning = f"⚠️  {msg}\n"
+    except Exception:
+        pass
+
+    return f"{stale_warning}{no_project_warning}Saved as action #{action_id}"
 
 
 @mcp.tool()
