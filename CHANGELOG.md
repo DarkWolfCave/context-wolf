@@ -2,6 +2,39 @@
 
 All notable changes to ContextWolf will be documented in this file.
 
+## [5.0.3] - 2026-04-20
+
+Pinned items (GUI feature integration) and schema hardening.
+
+### Added
+- New CLI command `cm pinned` - read-only listing of items curated in
+  the optional GUI (context-wolf-ui). Output as grouped Markdown, with
+  `--project` filter and `--json` output. Returns empty silently when
+  GUI tables are missing.
+- New optional MCP tool `pinned_list` - conditionally registered at
+  server startup. Only appears in the tool schema when the pinned_items
+  table exists (i.e., when the GUI is installed). Keeps the MCP schema
+  lean for CLI-only installations.
+- Migration 003: `pinned_item_projects` table for many-to-many project
+  scopes on pinned items (an item with no scope rows is global).
+- Migration 005: CHECK constraints on `ai_instructions.scope` and
+  `priority` columns to enforce the canonical vocabulary at the DB level.
+
+### Changed
+- Renamed feature "Promptstart" to "Pinned" across schema, GUI, CLI,
+  MCP tool, and docs. The old name collided semantically with `cm ai-prompt`
+  (different feature: auto session-starter vs. curated items). Fresh
+  installs use the new naming; existing installations can upgrade via
+  `ALTER TABLE` (manual, no downtime, no data loss).
+- Migration 002 renamed: `promptstart_items` -> `pinned_items` with
+  corresponding index renames.
+- All `cm init` flows updated to reflect the new naming.
+
+### Fixed
+- Migration 004: normalized `ai_instructions.priority = 'may'` rows to
+  `'nice'` (CLI vocabulary), cleaning up drift from an earlier GUI
+  implementation that used the RFC 2119 term.
+
 ## [5.0.2] - 2026-04-19
 
 Dependency fix to prevent broken `cm-mcp` installs.

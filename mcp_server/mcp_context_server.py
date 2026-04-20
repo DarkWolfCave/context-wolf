@@ -96,6 +96,35 @@ mcp = FastMCP(
 )
 
 
+# --- Feature Detection: Pinned (GUI-only feature) ---
+#
+# Pinned items are curated in the optional GUI (context-wolf-ui). If the
+# user has the GUI installed, the pinned_items table exists and we expose
+# `pinned_list` as an MCP tool. Without the GUI the tool stays unregistered
+# to keep the MCP schema lean.
+
+def _pinned_tables_available() -> bool:
+    """Quick one-shot DB check at import time. Own short-lived connection."""
+    try:
+        config = Config()
+        db = Database(config=config)
+        row = db.fetchone("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = 'pinned_items'
+        """)
+        db.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+_PINNED_AVAILABLE = _pinned_tables_available()
+if _PINNED_AVAILABLE:
+    logger.info("Pinned feature detected (GUI tables present) - registering pinned_list tool")
+else:
+    logger.info("Pinned feature not available (no GUI tables) - skipping pinned_list tool")
+
+
 # --- Tool-Usage Tracking Decorator ---
 
 def tracked(func):
@@ -513,6 +542,22 @@ def ai_prompt(
     if quick:
         return ai_prompt_mgr.generate_quick_start()
     return ai_prompt_mgr.generate_session_prompt(verbose=verbose, smart=smart, hours=hours)
+
+
+# ========== PINNED (conditional - only when GUI tables exist) ==========
+
+if _PINNED_AVAILABLE:
+    @mcp.tool()
+    @tracked
+    def pinned_list(
+        project: Optional[str] = Field(default=None, description="Optional project filter. Without project: all pinned items. With project: global items + items scoped to that project."),
+        ctx: Context = None,
+    ) -> str:
+        """List pinned items curated in the context-wolf-ui GUI (notes, snippets, actions, ai_instructions). Read-only; pinning is done in the GUI. Returns Markdown output grouped by item type."""
+        from src.features.pinned import PinnedManager
+        db = get_mgr(ctx, "db")
+        pinned_mgr = PinnedManager(db)
+        return pinned_mgr.export_markdown(project=project)
 
 
 # ========== INFRASTRUCTURE MANAGEMENT (5 tools) ==========

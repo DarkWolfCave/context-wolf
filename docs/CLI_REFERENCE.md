@@ -509,6 +509,42 @@ cm infra list-services --env prod
 
 ---
 
+## Pinned Commands
+
+**Read-only from the CLI.** Pinning items is a feature of the optional
+[context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui) GUI -
+the CLI can only list what you've pinned there. Without the GUI, the
+pinned_items table doesn't exist and `cm pinned` returns empty (no error).
+
+### pinned
+
+```
+cm pinned [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--project`, `-p` | - | Filter by project (returns global items + items scoped to this project) |
+| `--json` | Markdown | Output as JSON instead of the default grouped Markdown |
+
+**Behavior:**
+
+- Without GUI / missing tables: returns an empty list or a friendly placeholder message - never errors.
+- Without `--project`: all pinned items across all scopes, globals first.
+- With `--project X`: global items plus items explicitly scoped to project `X`.
+
+**Examples:**
+
+```bash
+cm pinned
+cm pinned --project myapp
+cm pinned --json > /tmp/pinned.json
+```
+
+**Not exposed via MCP:** `pinned` is a user-triggered helper (you decide when to paste it into a prompt), so it is intentionally not registered as an MCP tool. This keeps the MCP tool schema lean.
+
+---
+
 ## Setup Commands
 
 Initial setup and diagnostics.
@@ -545,5 +581,6 @@ cm setup-mcp             # Configure MCP server in Claude Code
 | `cm todo *` | Task management |
 | `cm test *` | Test suite management |
 | `cm infra *` | Infrastructure tracking |
+| `cm pinned` | List GUI-curated pinned items (read-only) |
 | `cm init` / `cm doctor` | Setup and diagnostics |
 | `cm setup-mcp` | MCP configuration |

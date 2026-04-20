@@ -1,8 +1,8 @@
--- Migration 002: Promptstart items for session startup curation
+-- Migration 002: Pinned items for session startup curation
 -- Allows users to pin notes, actions, snippets, and AI instructions
--- to a per-project (or global) promptstart collection.
+-- to a per-project (or global) pinned collection.
 
-CREATE TABLE IF NOT EXISTS promptstart_items (
+CREATE TABLE IF NOT EXISTS pinned_items (
     id SERIAL PRIMARY KEY,
     project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
     item_type TEXT NOT NULL CHECK (item_type IN ('note', 'action', 'snippet', 'ai_instruction')),
@@ -12,15 +12,15 @@ CREATE TABLE IF NOT EXISTS promptstart_items (
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
 );
 
--- Prevent duplicate items per promptstart context
+-- Prevent duplicate items per pinned context
 -- COALESCE handles NULL project_id (global items) for uniqueness
-CREATE UNIQUE INDEX IF NOT EXISTS idx_promptstart_unique
-ON promptstart_items(COALESCE(project_id, 0), item_type, item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pinned_unique
+ON pinned_items(COALESCE(project_id, 0), item_type, item_id);
 
 -- Fast lookup by project
-CREATE INDEX IF NOT EXISTS idx_promptstart_project
-ON promptstart_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_pinned_project
+ON pinned_items(project_id);
 
 -- Fast ordered retrieval
-CREATE INDEX IF NOT EXISTS idx_promptstart_sort
-ON promptstart_items(project_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_pinned_sort
+ON pinned_items(project_id, sort_order);

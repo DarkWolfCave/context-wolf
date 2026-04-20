@@ -542,3 +542,7 @@ def _add_setup_commands(subparsers):
     subparsers.add_parser('init', help='Interactive setup wizard (configure DB, start Docker)')
     subparsers.add_parser('doctor', help='Check prerequisites and system health')
     subparsers.add_parser('setup-mcp', help='Configure MCP server in ~/.claude.json')
+
+    pinned_parser = subparsers.add_parser('pinned', help='list pinned items curated in GUI (read-only)')
+    pinned_parser.add_argument('--project', '-p', help='filter by project (global + project items)')
+    pinned_parser.add_argument('--json', action='store_true', help='JSON output instead of Markdown')

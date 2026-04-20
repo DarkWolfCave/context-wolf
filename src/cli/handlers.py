@@ -26,6 +26,7 @@ from ..features.test_management import TestManager
 from ..features.test_runner import TestRunner
 from ..features.test_reporting import TestReporter
 from ..features.infrastructure import InfrastructureManager
+from ..features.pinned import PinnedManager
 
 
 class CommandHandlers:
@@ -64,6 +65,7 @@ class CommandHandlers:
         self.test_runner = TestRunner(db)
         self.test_reporter = TestReporter(db)
         self.infrastructure = InfrastructureManager(db)
+        self.pinned = PinnedManager(db)
 
         # Indexing needs save callback from actions
         self.indexing = IndexingManager(
@@ -526,6 +528,21 @@ class CommandHandlers:
             print(f"✅ Snippet '{args.name}' deleted")
         else:
             print(f"❌ Snippet '{args.name}' not found")
+
+    # ==================== PINNED COMMANDS ====================
+
+    def handle_pinned(self, args):
+        """Handle pinned command - read-only listing of GUI-curated items."""
+        import json
+        project = getattr(args, 'project', None)
+
+        if getattr(args, 'json', False):
+            items = self.pinned.list(project=project)
+            print(json.dumps(items, indent=2, default=str))
+            return
+
+        output = self.pinned.export_markdown(project=project)
+        print(output)
 
     # ==================== DELETE COMMANDS ====================
 
@@ -1940,6 +1957,7 @@ def dispatch_command(args, handlers: CommandHandlers):
         'todo': handlers.handle_todo,
         'test': handlers.handle_test,
         'infra': handlers.handle_infra,
+        'pinned': handlers.handle_pinned,
     }
 
     if not args.command:

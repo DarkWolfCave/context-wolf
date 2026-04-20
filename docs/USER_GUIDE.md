@@ -134,6 +134,10 @@ The core data unit. Each entry has:
 
 When saving, ContextWolf checks for entries with 85%+ similarity and warns you. This prevents the database from filling up with redundant information.
 
+### Pinned Items (GUI feature, CLI read-only)
+
+The optional GUI [context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui) lets you pin specific notes, snippets, actions, or AI instructions for quick session startup. From the CLI you can read the curated list with `cm pinned` (with optional `--project` filter and `--json` output). If the GUI is not installed, `cm pinned` silently returns an empty list - no errors.
+
 ### Git Integration
 
 ContextWolf can automatically track your commits via a post-commit hook. This is **not** set up automatically - you need to install the hook per repository:

@@ -195,7 +195,14 @@ cm ai-instruction "Always use snake_case" --category style --priority should
 # Infrastructure
 cm infra add-host "web01" --ip 10.0.0.1 --user deploy --location extern
 cm infra list-hosts
+
+# Pinned items (pinning requires the optional GUI; CLI is read-only)
+cm pinned                            # all pinned items as Markdown
+cm pinned --project myapp            # global + project-scoped items
+cm pinned --json                     # JSON output
 ```
+
+> **Note:** Pinning items is done in the optional [context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui) GUI. The CLI can only list what you've pinned there. Without the GUI installed, `cm pinned` returns an empty list (no error).
 
 ### MCP Server (Claude Code)
 
