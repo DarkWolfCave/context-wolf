@@ -1,4 +1,4 @@
-# ContextWolf CLI Reference (V5.0.0)
+# ContextWolf CLI Reference (V5.1.0)
 
 Complete reference for the `cm` command-line interface.
 
@@ -509,6 +509,95 @@ cm infra list-services --env prod
 
 ---
 
+## Now Commands
+
+Cross-project sprint backlog with WIP limits. Three active buckets
+(`today` / `week` / `later`) plus a 24h `done` holding bucket. Items
+can either stand alone or reference an existing CM entity (TODO, note,
+snippet, action, AI instruction, host, service); `now list` shows the
+linked entity's live status.
+
+All Now commands use the `now` subcommand prefix.
+
+### now add
+
+Add an item to the Now list. Refuses to add when the bucket's WIP
+limit is reached - move or remove an existing item first.
+
+```
+cm now add <title> [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--bucket`, `-b` | `today` | Target bucket: `today`, `week`, `later` |
+| `--project`, `-p` | - | Project name (cross-project is fine) |
+| `--link-type` | - | Reference an existing CM entity: `todo`, `action`, `note`, `snippet`, `ai_instruction`, `host`, `service` |
+| `--link-id` | - | ID of the linked entity (required with `--link-type`) |
+
+### now list
+
+List Now items, grouped by bucket with capacity indicators.
+
+```
+cm now list [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--bucket`, `-b` | - | Filter: `today`, `week`, `later`, `done` |
+| `--project`, `-p` | - | Filter by project |
+| `--all` | - | Include the `done` bucket |
+| `--json` | - | Emit the raw JSON response (the UI contract) |
+
+### now lifecycle
+
+```
+cm now show <id>                       # show one item with link payload
+cm now move <id> <bucket>              # bucket: today | week | later
+cm now done <id>                       # mark as done (24h holding)
+cm now remove <id>                     # hard-delete (drop, not finish)
+```
+
+### now reorder
+
+Rewrite the order of items in a bucket (drag-and-drop result). `ids`
+must list every item currently in the bucket exactly once.
+
+```
+cm now reorder <bucket> <ids...>
+```
+
+### now settings
+
+Show current WIP limits, or update one or more (range 1-100).
+
+```
+cm now settings                        # show current limits
+cm now settings --today 5              # change one limit
+cm now settings --today 5 --week 15    # change multiple
+```
+
+| Option | Description |
+|--------|-------------|
+| `--today` | New limit for `today` |
+| `--week` | New limit for `week` |
+| `--later` | New limit for `later` |
+
+**Examples - Now:**
+
+```bash
+cm now add "Fix DSGVO footer link" -b today -p myapp
+cm now add "Polish settings dialog" --link-type todo --link-id 42
+cm now list
+cm now move 5 week
+cm now done 5
+cm now reorder today 7 5 3 2 1
+cm now settings --today 5
+```
+
+---
+
 ## Pinned Commands
 
 **Read-only from the CLI.** Pinning items is a feature of the optional
@@ -581,6 +670,7 @@ cm setup-mcp             # Configure MCP server in Claude Code
 | `cm todo *` | Task management |
 | `cm test *` | Test suite management |
 | `cm infra *` | Infrastructure tracking |
+| `cm now *` | Sprint backlog (today / week / later) |
 | `cm pinned` | List GUI-curated pinned items (read-only) |
 | `cm init` / `cm doctor` | Setup and diagnostics |
 | `cm setup-mcp` | MCP configuration |

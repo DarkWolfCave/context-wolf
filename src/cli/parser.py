@@ -65,6 +65,7 @@ Examples:
     _add_todo_commands(subparsers)
     _add_test_commands(subparsers)
     _add_infra_commands(subparsers)
+    _add_now_commands(subparsers)
     _add_setup_commands(subparsers)
 
     return parser
@@ -535,6 +536,67 @@ def _add_infra_commands(subparsers):
     delete_service = infra_subparsers.add_parser('delete-service', help='delete service')
     delete_service.add_argument('hostname', help='Hostname')
     delete_service.add_argument('service_name', help='Service name to delete')
+
+
+def _add_now_commands(subparsers):
+    """'Now' sprint backlog commands (cross-project shortlist)."""
+    now_parser = subparsers.add_parser(
+        'now',
+        help='Now: cross-project sprint backlog (today / week / later)'
+    )
+    now_sub = now_parser.add_subparsers(dest='now_command', help='now subcommands')
+
+    # now add
+    n_add = now_sub.add_parser('add', help='add an item to the Now list')
+    n_add.add_argument('title', help='short, action-oriented title (max 200 chars)')
+    n_add.add_argument('--bucket', '-b', choices=['today', 'week', 'later'],
+                       default='today', help="target bucket (default: today)")
+    n_add.add_argument('--project', '-p', help='project name (optional)')
+    n_add.add_argument('--link-type', choices=[
+        'todo', 'action', 'note', 'snippet', 'ai_instruction', 'host', 'service'
+    ], help='reference an existing CM entity by type')
+    n_add.add_argument('--link-id', type=int, help='ID of the linked entity (required with --link-type)')
+
+    # now list
+    n_list = now_sub.add_parser('list', help='list Now items')
+    n_list.add_argument('--bucket', '-b', choices=['today', 'week', 'later', 'done'],
+                        help='filter by bucket')
+    n_list.add_argument('--project', '-p', help='filter by project')
+    n_list.add_argument('--all', action='store_true',
+                        help="include 'done' bucket")
+    n_list.add_argument('--json', action='store_true',
+                        help='emit raw JSON (the UI contract)')
+
+    # now show
+    n_show = now_sub.add_parser('show', help='show a Now item')
+    n_show.add_argument('id', type=int, help='Now item ID')
+
+    # now move
+    n_move = now_sub.add_parser('move', help='move a Now item to another bucket')
+    n_move.add_argument('id', type=int, help='Now item ID')
+    n_move.add_argument('bucket', choices=['today', 'week', 'later'],
+                        help='target bucket')
+
+    # now done
+    n_done = now_sub.add_parser('done', help='mark a Now item as done')
+    n_done.add_argument('id', type=int, help='Now item ID')
+
+    # now remove
+    n_remove = now_sub.add_parser('remove', help='delete a Now item')
+    n_remove.add_argument('id', type=int, help='Now item ID')
+
+    # now reorder
+    n_reorder = now_sub.add_parser('reorder', help='reorder items in a bucket')
+    n_reorder.add_argument('bucket', choices=['today', 'week', 'later', 'done'],
+                           help='bucket to reorder')
+    n_reorder.add_argument('ids', nargs='+', type=int,
+                           help='item IDs in the new order (must match the bucket exactly)')
+
+    # now settings
+    n_settings = now_sub.add_parser('settings', help='show or update WIP limits')
+    n_settings.add_argument('--today', type=int, help='new limit for today (1-100)')
+    n_settings.add_argument('--week', type=int, help='new limit for week (1-100)')
+    n_settings.add_argument('--later', type=int, help='new limit for later (1-100)')
 
 
 def _add_setup_commands(subparsers):

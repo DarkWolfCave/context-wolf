@@ -26,6 +26,7 @@ from ..features.test_management import TestManager
 from ..features.test_runner import TestRunner
 from ..features.test_reporting import TestReporter
 from ..features.infrastructure import InfrastructureManager
+from ..features.now import NowManager, NowLimitExceeded
 from ..features.pinned import PinnedManager
 
 
@@ -65,6 +66,7 @@ class CommandHandlers:
         self.test_runner = TestRunner(db)
         self.test_reporter = TestReporter(db)
         self.infrastructure = InfrastructureManager(db)
+        self.now = NowManager(db)
         self.pinned = PinnedManager(db)
 
         # Indexing needs save callback from actions
@@ -1927,6 +1929,166 @@ class CommandHandlers:
         else:
             print(f"❌ {message}")
             sys.exit(1)
+
+    # ==================== NOW COMMANDS ====================
+
+    BUCKET_ICONS = {
+        'today': '🔥',
+        'week':  '📅',
+        'later': '📥',
+        'done':  '✅',
+    }
+
+    def handle_now(self, args):
+        """Handle 'now' command with subcommands."""
+        if not getattr(args, 'now_command', None):
+            print("❌ No 'now' subcommand specified")
+            print("Available: add, list, show, move, done, remove, reorder, settings")
+            return
+
+        sub_handlers = {
+            'add': self._now_add,
+            'list': self._now_list,
+            'show': self._now_show,
+            'move': self._now_move,
+            'done': self._now_done,
+            'remove': self._now_remove,
+            'reorder': self._now_reorder,
+            'settings': self._now_settings,
+        }
+        handler = sub_handlers.get(args.now_command)
+        if not handler:
+            print(f"❌ Unknown 'now' command: {args.now_command}")
+            return
+        handler(args)
+
+    def _now_add(self, args):
+        try:
+            if args.link_type and args.link_id is None:
+                print("❌ --link-id is required when --link-type is set")
+                return
+            item_id = self.now.add_item(
+                title=args.title,
+                bucket=args.bucket,
+                project_name=args.project,
+                linked_type=args.link_type,
+                linked_id=args.link_id,
+            )
+            link_info = f" -> {args.link_type}#{args.link_id}" if args.link_type else ""
+            project_info = f" [{args.project}]" if args.project else ""
+            print(f"✅ Now item #{item_id} added to '{args.bucket}'{project_info}{link_info}")
+        except NowLimitExceeded as e:
+            print(f"❌ Bucket '{e.bucket}' is full ({e.current}/{e.limit}).")
+            print("   Demote or remove an item before adding another.")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_list(self, args):
+        data = self.now.list_items(
+            bucket=args.bucket,
+            project_name=args.project,
+            include_done=args.all,
+        )
+        if args.json:
+            print(json.dumps(data, indent=2, default=str))
+            return
+
+        items = data['items']
+        counts = data['counts']
+        limits = data['limits']
+
+        if not items:
+            print("No Now items")
+        else:
+            current_bucket = None
+            for item in items:
+                if item['bucket'] != current_bucket:
+                    current_bucket = item['bucket']
+                    icon = self.BUCKET_ICONS.get(current_bucket, '•')
+                    if current_bucket in limits:
+                        print(f"\n{icon} {current_bucket.upper()} "
+                              f"({counts[current_bucket]}/{limits[current_bucket]})")
+                    else:
+                        print(f"\n{icon} {current_bucket.upper()} ({counts[current_bucket]})")
+                    print("-" * 50)
+
+                link = item.get('linked')
+                link_str = ""
+                if link:
+                    if link.get('exists') is False:
+                        link_str = f"  ⚠ {link['type']}#{link['id']} (deleted)"
+                    else:
+                        status = link.get('status') or ""
+                        status_str = f" [{status}]" if status else ""
+                        link_str = f"  → {link['type']}#{link['id']}{status_str}"
+
+                project_str = f" [{item['project']}]" if item.get('project') else ""
+                print(f"  #{item['id']:>4} {item['title']}{project_str}{link_str}")
+
+        print()
+        cap_summary = ", ".join(
+            f"{b}={counts[b]}/{limits[b]}" if b in limits else f"{b}={counts[b]}"
+            for b in ('today', 'week', 'later', 'done')
+        )
+        print(f"Capacity: {cap_summary}")
+
+    def _now_show(self, args):
+        item = self.now.get_item(args.id)
+        if not item:
+            print(f"❌ Now item #{args.id} not found")
+            return
+        print(json.dumps(item, indent=2, default=str))
+
+    def _now_move(self, args):
+        try:
+            result = self.now.move_item(args.id, args.bucket)
+            if result.get('moved'):
+                print(f"✅ Now item #{args.id}: {result['from']} -> {result['bucket']}")
+            else:
+                print(f"ℹ️  Now item #{args.id} already in '{args.bucket}'")
+        except NowLimitExceeded as e:
+            print(f"❌ Bucket '{e.bucket}' is full ({e.current}/{e.limit})")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_done(self, args):
+        try:
+            self.now.mark_done(args.id)
+            print(f"✅ Now item #{args.id} marked done")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_remove(self, args):
+        try:
+            self.now.remove_item(args.id)
+            print(f"🗑️  Now item #{args.id} removed")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_reorder(self, args):
+        try:
+            count = self.now.reorder_bucket(args.bucket, list(args.ids))
+            print(f"✅ Reordered {count} items in '{args.bucket}'")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_settings(self, args):
+        any_update = (args.today is not None or args.week is not None
+                      or args.later is not None)
+        try:
+            if any_update:
+                settings = self.now.update_settings(
+                    today=args.today, week=args.week, later=args.later
+                )
+                print(f"✅ WIP limits updated")
+            else:
+                settings = self.now.get_settings()
+            for bucket in ('today', 'week', 'later'):
+                print(f"  {bucket}: {settings[bucket]}")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+
 def dispatch_command(args, handlers: CommandHandlers):
     """
     Dispatch command to appropriate handler.
@@ -1966,6 +2128,7 @@ def dispatch_command(args, handlers: CommandHandlers):
         'todo': handlers.handle_todo,
         'test': handlers.handle_test,
         'infra': handlers.handle_infra,
+        'now': handlers.handle_now,
         'pinned': handlers.handle_pinned,
     }
 

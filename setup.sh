@@ -44,15 +44,27 @@ install_deps() {
     echo ""
 
     echo "📦 Installing cm globally..."
-    uv tool install --force --from "$SCRIPT_DIR" context-wolf 2>&1 | tail -3
+    # --reinstall (not --force): --force only replaces the tool installation
+    # from uv's wheel cache. With a dynamic-version package (Hatch reads
+    # src/version.py) the cached wheel can be stale, so --force will quietly
+    # reinstall the previous version. --reinstall forces a fresh build.
+    uv tool install --reinstall --from "$SCRIPT_DIR" context-wolf 2>&1 | tail -3
     echo ""
 
-    # Verify
-    if "$SCRIPT_DIR/.venv/bin/cm" --version > /dev/null 2>&1; then
-        VERSION=$("$SCRIPT_DIR/.venv/bin/cm" --version 2>&1)
-        echo "✅ $VERSION"
+    # Verify against the global cm in PATH (uv tool's), not the local .venv
+    # copy — the .venv copy is editable and would report the new version
+    # even if the global install silently kept the old one.
+    GLOBAL_CM="$HOME/.local/bin/cm"
+    if [ ! -x "$GLOBAL_CM" ]; then
+        GLOBAL_CM="$(command -v cm 2>/dev/null || true)"
+    fi
+    if [ -n "$GLOBAL_CM" ] && "$GLOBAL_CM" --version > /dev/null 2>&1; then
+        VERSION=$("$GLOBAL_CM" --version 2>&1)
+        echo "✅ $VERSION (installed at: $GLOBAL_CM)"
     else
-        echo "❌ Installation failed."
+        echo "❌ Installation failed - 'cm' not found on PATH."
+        echo "   If ~/.local/bin is not on your PATH, add it:"
+        echo "     export PATH=\"\$HOME/.local/bin:\$PATH\""
         exit 1
     fi
 }

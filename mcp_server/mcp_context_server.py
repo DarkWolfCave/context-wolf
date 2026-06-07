@@ -34,6 +34,7 @@ from src.features.test_reporting import TestReporter
 from src.features.smart_search import SmartSearchManager
 from src.features.infrastructure import InfrastructureManager
 from src.features.notes import NotesManager
+from src.features.now import NowManager, NowLimitExceeded
 from src.features.article_research import ArticleResearchManager
 from src.version import __version__
 
@@ -67,6 +68,7 @@ async def lifespan(app: FastMCP):
         "test_reporter": TestReporter(db),
         "infrastructure_manager": InfrastructureManager(db),
         "notes_manager": NotesManager(db),
+        "now_manager": NowManager(db),
     }
     managers["smart_search_manager"] = SmartSearchManager(
         db,
@@ -775,6 +777,87 @@ def infra_add_service(
     return f"Service '{service_name}' added to {hostname} (ID: {service_id})"
 
 
+# ========== INFRASTRUCTURE EDIT/DELETE (4 tools) ==========
+
+@mcp.tool()
+@tracked
+def infra_edit_host(
+    hostname: str = Field(description="SSH hostname to edit (must exist)"),
+    ip: Optional[str] = Field(default=None, description="IP address"),
+    port: Optional[int] = Field(default=None, description="SSH port"),
+    user: Optional[str] = Field(default=None, description="SSH user"),
+    identity_file: Optional[str] = Field(default=None, description="Path to SSH key (e.g., '~/.ssh/my-key')"),
+    location: Optional[Literal["local", "extern"]] = Field(default=None, description="Location: 'local' for LAN, 'extern' for internet"),
+    provider: Optional[str] = Field(default=None, description="Provider (e.g., 'Netcup', 'Hetzner', 'AWS')"),
+    server_type: Optional[str] = Field(default=None, description="Server type (e.g., 'VPS', 'Dedicated', 'Raspberry Pi')"),
+    tags: Optional[list[str]] = Field(default=None, description="Tags for categorization (replaces existing tags)"),
+    comment: Optional[str] = Field(default=None, description="Comment or description"),
+    ctx: Context = None,
+) -> str:
+    """Edit an existing infrastructure host. Only provided fields are updated."""
+    im = get_mgr(ctx, "infrastructure_manager")
+    updated = im.edit_host(
+        hostname=hostname, ip=ip, port=port, user=user, identity_file=identity_file,
+        location=location, provider=provider, server_type=server_type,
+        tags=tags, comment=comment,
+    )
+    if updated:
+        return f"Host '{hostname}' updated"
+    return f"Host '{hostname}' not found or no fields to update"
+
+
+@mcp.tool()
+@tracked
+def infra_delete_host(
+    hostname: str = Field(description="SSH hostname to delete"),
+    force: bool = Field(default=False, description="Force deletion even if services exist (CASCADE deletes all services)"),
+    ctx: Context = None,
+) -> str:
+    """Delete an infrastructure host. Use force=True to also delete all associated services."""
+    im = get_mgr(ctx, "infrastructure_manager")
+    _success, message = im.delete_host(hostname=hostname, force=force)
+    return message
+
+
+@mcp.tool()
+@tracked
+def infra_edit_service(
+    hostname: str = Field(description="Host where the service runs"),
+    service_name: str = Field(description="Service name to edit (must exist on the host)"),
+    env: Optional[Literal["prod", "staging", "dev", "test"]] = Field(default=None, description="Environment"),
+    app_path: Optional[str] = Field(default=None, description="Application path on host"),
+    service_type: Optional[str] = Field(default=None, description="Service type (e.g., 'docker', 'systemd', 'pm2')"),
+    deploy_method: Optional[str] = Field(default=None, description="Deployment method (e.g., 'ssh', 'local', 'docker compose')"),
+    health_url: Optional[str] = Field(default=None, description="Health check URL"),
+    tags: Optional[list[str]] = Field(default=None, description="Tags for categorization (replaces existing tags)"),
+    comment: Optional[str] = Field(default=None, description="Comment or description"),
+    ctx: Context = None,
+) -> str:
+    """Edit an existing service on an infrastructure host. Only provided fields are updated."""
+    im = get_mgr(ctx, "infrastructure_manager")
+    updated = im.edit_service(
+        hostname=hostname, service_name=service_name, env=env, app_path=app_path,
+        service_type=service_type, deploy_method=deploy_method,
+        health_url=health_url, tags=tags, comment=comment,
+    )
+    if updated:
+        return f"Service '{service_name}' on '{hostname}' updated"
+    return f"Service '{service_name}' not found on '{hostname}' or no fields to update"
+
+
+@mcp.tool()
+@tracked
+def infra_delete_service(
+    hostname: str = Field(description="Host where the service runs"),
+    service_name: str = Field(description="Service name to delete"),
+    ctx: Context = None,
+) -> str:
+    """Delete a service from an infrastructure host."""
+    im = get_mgr(ctx, "infrastructure_manager")
+    _success, message = im.delete_service(hostname=hostname, service_name=service_name)
+    return message
+
+
 # ========== NOTES (5 tools) ==========
 
 @mcp.tool()
@@ -897,6 +980,163 @@ def note_delete(
     nm = get_mgr(ctx, "notes_manager")
     nm.delete_note(int(note_id))
     return f"Note #{note_id} deleted"
+
+
+# ========== NOW (sprint backlog, 9 tools) ==========
+#
+# "Now" is a tight cross-project shortlist of what the user is actively
+# working on. Items live in three active buckets (today/week/later) plus
+# a short-lived `done` holding bucket. Each bucket has a WIP limit; the
+# `done` bucket is auto-purged after 24h on the next list call.
+#
+# Items may either be free-form or reference an existing CM entity
+# (todo, action, note, snippet, ai_instruction, host, service). When
+# listed, the manager JOINs on the referenced table so callers see the
+# live status of the linked entity.
+
+_NOW_LINK_LITERAL = Literal[
+    "todo", "action", "note", "snippet", "ai_instruction", "host", "service"
+]
+_NOW_BUCKET_ACTIVE = Literal["today", "week", "later"]
+_NOW_BUCKET_ANY = Literal["today", "week", "later", "done"]
+
+
+@mcp.tool()
+@tracked
+def now_add(
+    title: str = Field(description="Short, action-oriented title (max 200 chars)"),
+    bucket: _NOW_BUCKET_ACTIVE = Field(default="today", description="Target bucket: today / week / later"),
+    project: Optional[str] = Field(default=None, description="Project name (optional, cross-project is fine)"),
+    link_type: Optional[_NOW_LINK_LITERAL] = Field(default=None, description="Optional: existing CM entity type this item references"),
+    link_id: Optional[Union[int, str]] = Field(default=None, description="Optional: ID of the linked entity. Required when link_type is set."),
+    ctx: Context = None,
+) -> str:
+    """Add an item to the cross-project Now list. Refuses to add when the bucket's WIP limit is reached - demote or remove an existing item first."""
+    nm = get_mgr(ctx, "now_manager")
+    try:
+        item_id = nm.add_item(
+            title=title,
+            bucket=bucket,
+            project_name=project,
+            linked_type=link_type,
+            linked_id=int(link_id) if link_id is not None else None,
+        )
+    except NowLimitExceeded as e:
+        return (
+            f"Bucket '{e.bucket}' is full ({e.current}/{e.limit}). "
+            "Move or remove an existing item before adding a new one."
+        )
+    link_info = f" -> {link_type}#{link_id}" if link_type else ""
+    project_info = f" [{project}]" if project else ""
+    return f"Now item #{item_id} added to '{bucket}'{project_info}{link_info}"
+
+
+@mcp.tool()
+@tracked
+def now_list(
+    bucket: Optional[_NOW_BUCKET_ANY] = Field(default=None, description="Filter by bucket (omit to see all active buckets)"),
+    project: Optional[str] = Field(default=None, description="Filter by project"),
+    include_done: bool = Field(default=False, description="Include the 'done' holding bucket"),
+    ctx: Context = None,
+) -> str:
+    """List Now items, ordered by bucket and position. Returns JSON: {items, counts, limits}. Each item carries a `linked` payload with live status when it references an existing CM entity."""
+    nm = get_mgr(ctx, "now_manager")
+    data = nm.list_items(bucket=bucket, project_name=project, include_done=include_done)
+    return json.dumps(data, indent=2, default=str)
+
+
+@mcp.tool()
+@tracked
+def now_show(
+    item_id: Union[int, str] = Field(description="Now item ID"),
+    ctx: Context = None,
+) -> str:
+    """Show a single Now item including its linked-entity payload (if any)."""
+    nm = get_mgr(ctx, "now_manager")
+    item = nm.get_item(int(item_id))
+    if not item:
+        return f"Now item #{item_id} not found"
+    return json.dumps(item, indent=2, default=str)
+
+
+@mcp.tool()
+@tracked
+def now_move(
+    item_id: Union[int, str] = Field(description="Now item ID"),
+    to_bucket: _NOW_BUCKET_ACTIVE = Field(description="Target bucket (today / week / later). Use now_done() to finish an item."),
+    ctx: Context = None,
+) -> str:
+    """Move a Now item between active buckets. Respects the target bucket's WIP limit."""
+    nm = get_mgr(ctx, "now_manager")
+    try:
+        result = nm.move_item(int(item_id), to_bucket)
+    except NowLimitExceeded as e:
+        return (
+            f"Bucket '{e.bucket}' is full ({e.current}/{e.limit}). "
+            "Move or remove an existing item before moving another into it."
+        )
+    if not result.get("moved"):
+        return f"Now item #{item_id} already in '{to_bucket}'"
+    return f"Now item #{item_id}: {result['from']} -> {result['bucket']}"
+
+
+@mcp.tool()
+@tracked
+def now_done(
+    item_id: Union[int, str] = Field(description="Now item ID to mark as done"),
+    ctx: Context = None,
+) -> str:
+    """Mark a Now item as done. It moves into the 'done' holding bucket and is purged automatically after 24h."""
+    nm = get_mgr(ctx, "now_manager")
+    nm.mark_done(int(item_id))
+    return f"Now item #{item_id} marked done"
+
+
+@mcp.tool()
+@tracked
+def now_remove(
+    item_id: Union[int, str] = Field(description="Now item ID to delete"),
+    ctx: Context = None,
+) -> str:
+    """Hard-delete a Now item. Use this to kick something off the list entirely (instead of finishing it via now_done)."""
+    nm = get_mgr(ctx, "now_manager")
+    nm.remove_item(int(item_id))
+    return f"Now item #{item_id} removed"
+
+
+@mcp.tool()
+@tracked
+def now_reorder(
+    bucket: _NOW_BUCKET_ANY = Field(description="Bucket to reorder"),
+    ordered_ids: list[int] = Field(description="Item IDs in the new order. Must list every item currently in the bucket exactly once."),
+    ctx: Context = None,
+) -> str:
+    """Rewrite the order of items in a bucket (e.g. after drag&drop). ordered_ids must match the bucket's current contents exactly."""
+    nm = get_mgr(ctx, "now_manager")
+    count = nm.reorder_bucket(bucket, ordered_ids)
+    return f"Reordered {count} items in '{bucket}'"
+
+
+@mcp.tool()
+@tracked
+def now_settings_get(ctx: Context = None) -> str:
+    """Return the current WIP limits for today / week / later as JSON."""
+    nm = get_mgr(ctx, "now_manager")
+    return json.dumps(nm.get_settings(), indent=2)
+
+
+@mcp.tool()
+@tracked
+def now_settings_set(
+    today: Optional[int] = Field(default=None, description="New WIP limit for 'today' (1-100)"),
+    week: Optional[int] = Field(default=None, description="New WIP limit for 'week' (1-100)"),
+    later: Optional[int] = Field(default=None, description="New WIP limit for 'later' (1-100)"),
+    ctx: Context = None,
+) -> str:
+    """Update one or more bucket WIP limits. Only provided values are changed. Returns the resulting settings."""
+    nm = get_mgr(ctx, "now_manager")
+    new_settings = nm.update_settings(today=today, week=week, later=later)
+    return json.dumps(new_settings, indent=2)
 
 
 # ========== ARTICLE RESEARCH (1 tool) ==========

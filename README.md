@@ -13,11 +13,12 @@ Stores decisions, code snippets, infrastructure details, and TODOs - so your AI 
 ## What it does
 
 - **Cross-Project Search** - Full-text search + semantic vector search across all projects
-- **MCP Integration** - 31 tools available directly in Claude Code sessions
+- **MCP Integration** - 44 tools available directly in Claude Code sessions
 - **Notes** - Long-form reference documents with tags and full-text search
 - **Snippets** - Code snippet library with tags and type detection
 - **Infrastructure Tracking** - Structured SSH host & service management
 - **TODO Lifecycle** - Task tracking with priorities, categories, and status
+- **Now (sprint backlog)** - Curated cross-project shortlist with WIP limits (today / week / later), can link to existing TODOs/notes/snippets and show their live status
 - **Git Integration** - Post-commit hooks auto-track commits (opt-in per repo)
 - **Duplicate Detection** - Warns at 85%+ similarity
 
@@ -142,6 +143,23 @@ bash setup.sh --init           # Configure database
 bash setup.sh --setup-mcp      # Configure Claude Code MCP
 ```
 
+### Updating to a newer version
+
+ContextWolf has no auto-updater - new versions don't reach your machine until you fetch them. From the repo directory:
+
+```bash
+git pull
+bash setup.sh --install-only        # rebuilds the cm / cm-mcp / cm-embed tool
+```
+
+`setup.sh --install-only` runs `uv tool install --reinstall`, which forces uv to rebuild the wheel from the current source and replace the previous installation. (Plain `--force` is not enough - uv may reuse a cached wheel that still carries the old version.) After that:
+
+- **CLI (`cm`):** the new commands are available immediately - check with `cm --version`.
+- **MCP server:** restart Claude Code (or run `/mcp` and reconnect the `context-manager` server) so it loads the new code.
+- **Database schema:** any new SQL migrations are applied automatically on the next `cm` call or MCP server start - no manual step needed.
+
+If you only need the MCP tools updated (not the CLI), a Claude Code restart after `git pull` is enough, because the MCP server is launched directly from the repo via `uv run`. The CLI is the part that stays frozen until you reinstall it.
+
 ### Database on a separate server
 
 If you want PostgreSQL on a different machine (e.g., a Raspberry Pi or NAS) and the MCP server on your local machine:
@@ -189,6 +207,13 @@ cm todo add "Fix auth bug" --priority high
 cm todo start 123
 cm todo done 123
 
+# Now (cross-project sprint backlog)
+cm now add "Fix auth bug" --bucket today --project myapp
+cm now add "Polish settings page" --link-type todo --link-id 123   # references a TODO
+cm now list
+cm now move 5 week
+cm now done 5
+
 # AI Instructions
 cm ai-instruction "Always use snake_case" --category style --priority should
 
@@ -206,7 +231,7 @@ cm pinned --json                     # JSON output
 
 ### MCP Server (Claude Code)
 
-Automatically configured by `bash setup.sh` or `cm setup-mcp`. Exposes 31 tools: `context_save`, `context_search`, `todo_add`, `infra_list_hosts`, `infra_add_host`, `note_save`, and more.
+Automatically configured by `bash setup.sh` or `cm setup-mcp`. Exposes 44 tools: `context_save`, `context_search`, `todo_add`, `infra_list_hosts`, `infra_add_host`, `note_save`, `now_add`, `now_list`, and more.
 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full list.
 
@@ -245,7 +270,7 @@ For automatic updates, set up a cron job or launchd timer (see `embedding_worker
 - **Local embeddings** - Semantic search uses a lightweight ONNX model (all-MiniLM-L6-v2, ~90 MB) running on your CPU. Zero API calls for vector generation.
 - **On-demand retrieval** - ContextWolf does NOT inject your entire database into Claude's context. MCP tools return only the relevant results for the current query (ranked by full-text search + vector similarity).
 
-**Token overhead:** The 31 MCP tool definitions are deferred by default - only tool names are loaded at session start (~356 tokens). Full schemas are fetched on-demand when Claude actually uses a tool. The actual data is only retrieved when a tool is called.
+**Token overhead:** The 44 MCP tool definitions are deferred by default - only tool names are loaded at session start. Full schemas are fetched on-demand when Claude actually uses a tool. The actual data is only retrieved when a tool is called.
 
 ## Architecture
 
@@ -256,7 +281,7 @@ src/
 ├── features/    # Modules (snippets, TODOs, notes, infra, AI instructions)
 └── cli/         # Argument parser + command handlers + setup wizard
 
-mcp_server/      # MCP integration (stdio, 31 tools)
+mcp_server/      # MCP integration (stdio, 44 tools)
 embedding_worker/ # ONNX-based vector embeddings (all-MiniLM-L6-v2)
 ```
 
@@ -274,7 +299,7 @@ Dependencies flow inward only.
 ## Documentation
 
 - [docs/USER_GUIDE.md](docs/USER_GUIDE.md) - Getting started guide
-- [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) - MCP tools reference (31 tools)
+- [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) - MCP tools reference (44 tools)
 - [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) - Complete CLI command reference
 - [CHANGELOG.md](CHANGELOG.md) - Version history
 

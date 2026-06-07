@@ -4,7 +4,7 @@
 
 Claude Code has built-in persistence - `CLAUDE.md` for project instructions, auto-memory in `MEMORY.md`, and feedback rules. These work well for small projects. But they don't scale: memory is capped at 200 lines, there's no semantic search, no cross-project queries, and no structured data (types, priorities, timestamps).
 
-ContextWolf fills that gap. It's a local knowledge management system that stores your decisions, code patterns, infrastructure details, and TODOs in a PostgreSQL database. It connects to Claude Code via MCP (Model Context Protocol), giving Claude access to 31 tools for saving and retrieving structured knowledge - with full-text search, semantic vector search, and cross-project queries.
+ContextWolf fills that gap. It's a local knowledge management system that stores your decisions, code patterns, infrastructure details, and TODOs in a PostgreSQL database. It connects to Claude Code via MCP (Model Context Protocol), giving Claude access to 44 tools for saving and retrieving structured knowledge - with full-text search, semantic vector search, and cross-project queries.
 
 **Example:** You decide to use session cookies over JWTs. ContextWolf stores this as a typed decision. Two weeks later, Claude starts a fresh session and searches ContextWolf before building a login route - it finds your decision across 7,000+ entries in under 1ms, without you repeating yourself.
 
@@ -134,6 +134,32 @@ The core data unit. Each entry has:
 
 When saving, ContextWolf checks for entries with 85%+ similarity and warns you. This prevents the database from filling up with redundant information.
 
+### Now vs. TODOs
+
+`cm todo` is the long-running task tracker - every TODO you'll ever
+work on, with priorities, categories, due dates, and dependencies.
+It grows over time and you filter it when you want a slice.
+
+`cm now` is the **opposite** intent: a deliberately small, curated
+list of what's in flight *right now* across all projects, with a
+hard WIP limit per bucket (defaults `today=7`, `week=20`, `later=50`).
+Items can either be free-form or reference an existing TODO/note/
+snippet/etc., and the listing pulls live status from the referenced
+table so you don't end up with "now" rows that lie about what they
+point to.
+
+The `done` bucket is a holding area - completed Now items disappear
+on their own after 24h, so the list doesn't bloat with last week's
+victories. Use `cm now done <id>` to finish something, or
+`cm now remove <id>` to drop it from the list without claiming it
+was completed.
+
+```bash
+# A free-form item plus one tied to TODO #42
+cm now add "Fix DSGVO footer link" --bucket today --project myapp
+cm now add "Polish settings dialog" --link-type todo --link-id 42
+```
+
 ### Pinned Items (GUI feature, CLI read-only)
 
 The optional GUI [context-wolf-ui](https://github.com/DarkWolfCave/context-wolf-ui) lets you pin specific notes, snippets, actions, or AI instructions for quick session startup. From the CLI you can read the curated list with `cm pinned` (with optional `--project` filter and `--json` output). If the GUI is not installed, `cm pinned` silently returns an empty list - no errors.
@@ -180,7 +206,7 @@ After running `cm setup-mcp`, ContextWolf registers itself in `~/.claude.json` a
 
 1. You start a new Claude Code session
 2. Claude Code launches the ContextWolf MCP server in the background
-3. Claude sees 31 tools (e.g., `context_save`, `context_search`, `todo_add`)
+3. Claude sees 44 tools (e.g., `context_save`, `context_search`, `todo_add`, `now_add`)
 4. Claude uses these tools when relevant - saving decisions, searching for prior context, managing TODOs
 
 ### Available MCP Tools (overview)
@@ -190,7 +216,8 @@ After running `cm setup-mcp`, ContextWolf registers itself in `~/.claude.json` a
 | Context | `context_save`, `context_search`, `context_show`, `context_move` |
 | Notes | `note_save`, `note_search`, `note_show`, `note_edit`, `note_delete` |
 | TODOs | `todo_add`, `todo_list`, `todo_start`, `todo_done`, `todo_show`, `todo_reopen`, `todo_cancel` |
-| Infrastructure | `infra_list_hosts`, `infra_show_host`, `infra_list_services`, `infra_search`, `infra_add_host`, `infra_add_service` |
+| Now | `now_add`, `now_list`, `now_show`, `now_move`, `now_done`, `now_remove`, `now_reorder`, `now_settings_get`, `now_settings_set` |
+| Infrastructure | `infra_list_hosts`, `infra_show_host`, `infra_list_services`, `infra_search`, `infra_add_host`, `infra_add_service`, `infra_edit_host`, `infra_delete_host`, `infra_edit_service`, `infra_delete_service` |
 | Snippets | `snippet_search`, `snippet_show`, `snippet_add`, `snippet_list` |
 | Meta | `session`, `stats`, `projects`, `ai_prompt`, `article_research` |
 
@@ -223,7 +250,7 @@ Adding instructions to your project's `CLAUDE.md` (e.g., "Always use context_sea
 | System health check | CLI (`cm doctor`) |
 | Setup and configuration | CLI (`cm init`, `cm setup-mcp`) |
 
-The CLI offers 60+ commands - more than the 31 MCP tools. Some operations (like `cm doctor`, `cm init`, or `cm vacuum`) are CLI-only.
+The CLI offers 60+ commands - more than the 44 MCP tools. Some operations (like `cm doctor`, `cm init`, or `cm vacuum`) are CLI-only.
 
 ---
 
@@ -289,15 +316,52 @@ For automatic updates, set up a cron job using `embedding_worker/cron_embed.sh`.
 
 ---
 
-## Development
+## Updating ContextWolf
 
-If you modify ContextWolf source code, install it in editable mode so changes take effect immediately:
+There is no auto-updater. New versions arrive on your machine only when you fetch them from the repo. The exact steps depend on which part of ContextWolf you mean - they update through different paths.
+
+### The standard update
 
 ```bash
-uv tool install -e .
+cd ~/path/to/context-wolf       # wherever you cloned it
+git pull
+bash setup.sh --install-only    # rebuilds the cm / cm-mcp / cm-embed tool
 ```
 
-Without `-e`, the `cm` command runs a frozen copy. Code changes won't be picked up until you reinstall. The `setup.sh` script installs without `-e` by design (stable for end users).
+`setup.sh --install-only` runs `uv tool install --reinstall`, which forces uv to rebuild the wheel from the current source and replace the previous installation. Run it from inside the repo so `uv` picks up the new sources.
+
+> **Why not `--force`?** Because ContextWolf uses a Hatch dynamic version (read from `src/version.py` at build time), `uv tool install --force` can silently reuse a cached wheel and leave you on the previous version - even though it reports success. `--reinstall` forces a fresh build. setup.sh was changed accordingly in V5.1.0 (see CHANGELOG).
+
+After that:
+
+- **CLI (`cm`):** new commands work immediately. Verify with `cm --version`.
+- **MCP server:** restart Claude Code, or run `/mcp` in a session and reconnect the `context-manager` server. The MCP process is launched fresh from the repo each time, so a restart picks up the new code.
+- **Database schema:** any new SQL migrations are applied automatically on the next `cm` call or MCP server start. No manual `psql` step.
+
+### Why the two paths differ
+
+| Component | How it runs | Reacts to `git pull` alone? |
+|---|---|---|
+| `cm`, `cm-embed` | `uv tool install` - frozen snapshot in `~/.local/share/uv/tools/context-wolf/` | **No.** Stays on the previously installed version until you reinstall. |
+| `cm-mcp` | `uv run --directory <repo> cm-mcp` (set in `~/.claude.json` by `cm setup-mcp`) | **Indirectly yes.** Loads fresh from the repo on each MCP server start, so a Claude Code restart is enough. |
+
+This means an MCP-only fix - a typo in a tool description, a new MCP tool - reaches you with just `git pull` plus a Claude Code restart. Any change to the CLI tool itself (new `cm` subcommand, new behavior in `cm doctor`, etc.) needs the reinstall step too.
+
+### Editable installs (when developing locally)
+
+If you are actively modifying ContextWolf source code, install it editable so changes take effect immediately without reinstalling:
+
+```bash
+uv tool install --reinstall -e .
+```
+
+With `-e`, the installed `cm` points back at your repo. Edit a file, the next `cm` call uses the new code - no reinstall in between. `setup.sh` installs without `-e` by design (more stable for end users).
+
+### Schema migrations
+
+Each new version that touches the database ships an SQL file in `migrations/`. They are applied automatically by the migrator (`src/core/migrator.py`) the next time anything connects to the database. You can verify the applied list with `psql` or by checking the `schema_migrations` table directly - but in normal use you don't need to.
+
+If a migration ever fails (e.g. the DB user lacks a permission), `cm doctor` will surface it. Fix the permission and try again - migrations are written to be idempotent.
 
 ---
 

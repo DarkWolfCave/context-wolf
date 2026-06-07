@@ -2,6 +2,65 @@
 
 All notable changes to ContextWolf will be documented in this file.
 
+## [5.1.1] - 2026-06-07
+
+### Fixed
+- **Complete schema on fresh installs.** On a clean database several objects
+  were missing, so todos, MD indexing and semantic search were unavailable out
+  of the box, and some epoch-timestamp columns used `INTEGER` (2038 overflow).
+  Databases upgraded from earlier versions already had them and were
+  unaffected. Migration 008 reconciles the schema (missing tables, views and
+  columns) and widens epoch-timestamp columns to `BIGINT`. The migration is
+  idempotent and safe to run on an existing database.
+
+## [5.1.0] - 2026-05-23
+
+"Now" sprint backlog: curated cross-project shortlist with WIP limits;
+plus the four missing infrastructure CRUD MCP tools.
+
+### Added
+- New "Now" sprint backlog: a curated cross-project shortlist of what's
+  actively in flight. Three active buckets (`today` / `week` / `later`)
+  plus a 24h `done` holding bucket, each with a configurable WIP limit
+  (defaults 7 / 20 / 50). Items can either stand alone or reference an
+  existing CM entity (todo, action, note, snippet, ai_instruction, host,
+  service); the listing JOINs on the referenced table so callers see
+  live status (e.g. a referenced TODO that has since been closed).
+  Migration 007 adds the `now_items` and `now_settings` tables. CLI
+  subcommands: `cm now {add,list,show,move,done,remove,reorder,settings}`.
+  MCP tools: `now_add`, `now_list`, `now_show`, `now_move`, `now_done`,
+  `now_remove`, `now_reorder`, `now_settings_get`, `now_settings_set`.
+- Four new MCP tools complete the infrastructure CRUD surface:
+  `infra_edit_host`, `infra_delete_host`, `infra_edit_service`,
+  `infra_delete_service`. The underlying backend methods already
+  existed; only the MCP wrappers were missing, forcing manual SQL or
+  CLI fallbacks when entries had to be renamed or removed. Edits
+  update only the fields you pass; `infra_delete_host` requires
+  `force=True` to cascade-delete services on a host that still has
+  any.
+
+### Fixed
+- `delete_host` raised `KeyError: 0` because the result row from the
+  `RealDictCursor` was indexed positionally instead of by column
+  name. The bug had been latent since the method was first written
+  (no callers existed). The CLI command `cm infra delete-host` and
+  the new `infra_delete_host` MCP tool both depend on this path.
+- `setup.sh --install-only` could silently leave the `cm` tool on
+  the previous version. Two latent bugs that together hid this since
+  the V5 rebrand:
+  1. `uv tool install --force` only replaces the installation from
+     uv's wheel cache. With a Hatch dynamic version (read from
+     `src/version.py` at build time) the cached wheel can carry the
+     previous version, so `--force` reinstalls *that*. Switched to
+     `--reinstall`, which forces a fresh build.
+  2. The post-install verification ran the editable `.venv/bin/cm`,
+     which always reports the current source version - so it printed
+     success even when the global install was still on the old
+     version. The check now targets the global `cm` on `PATH`.
+  Users who bumped from any V5.0.x release should now see the new
+  version after `git pull && bash setup.sh --install-only`. If you
+  were stuck on a prior bump, this is likely why.
+
 ## [5.0.4] - 2026-04-20
 
 Embedding worker health monitoring - failures become visible without manual log-tailing.

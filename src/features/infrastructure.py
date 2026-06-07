@@ -370,11 +370,11 @@ class InfrastructureManager:
             if not result:
                 return False, f"Host '{hostname}' not found"
 
-            host_id = result[0]
+            host_id = result['id']
 
             # Check for services
-            cursor.execute("SELECT COUNT(*) FROM infra_services WHERE host_id = %s", (host_id,))
-            service_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS cnt FROM infra_services WHERE host_id = %s", (host_id,))
+            service_count = cursor.fetchone()['cnt']
 
             if service_count > 0 and not force:
                 return False, f"Host has {service_count} service(s). Use --force to delete anyway."

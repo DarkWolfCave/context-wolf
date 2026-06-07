@@ -1,6 +1,6 @@
-# ContextWolf V5.0.0 - MCP Tools Reference
+# ContextWolf V5.1.0 - MCP Tools Reference
 
-Complete reference for all 31 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
+Complete reference for all 44 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
 
 ---
 
@@ -308,6 +308,57 @@ Add a service to an existing infrastructure host.
 | `tags` | array[string] | No | Tags |
 | `comment` | string | No | Comment |
 
+### `infra_edit_host`
+
+Update fields of an existing SSH host. Only provided fields are changed.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `hostname` | string | Yes | Existing hostname |
+| `ip` | string | No | New IP address |
+| `port` | integer | No | New SSH port |
+| `user` | string | No | New SSH user |
+| `identity_file` | string | No | New SSH key path |
+| `location` | string | No | Enum: `local`, `extern` |
+| `provider` | string | No | New provider |
+| `server_type` | string | No | New server type |
+| `tags` | array[string] | No | Replace tags |
+| `comment` | string | No | New comment |
+
+### `infra_delete_host`
+
+Delete an SSH host. By default fails if the host still has services attached.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `hostname` | string | Yes | - | Hostname to delete |
+| `force` | boolean | No | false | If true, cascade-delete the host's services |
+
+### `infra_edit_service`
+
+Update fields of an existing service. Only provided fields are changed.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `hostname` | string | Yes | Host the service runs on |
+| `service_name` | string | Yes | Service to edit |
+| `env` | string | No | Enum: `prod`, `staging`, `dev`, `test` |
+| `app_path` | string | No | New application path |
+| `service_type` | string | No | New service type |
+| `deploy_method` | string | No | New deploy method |
+| `health_url` | string | No | New health check URL |
+| `tags` | array[string] | No | Replace tags |
+| `comment` | string | No | New comment |
+
+### `infra_delete_service`
+
+Delete a service from a host.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `hostname` | string | Yes | Host the service runs on |
+| `service_name` | string | Yes | Service to delete |
+
 **Example:**
 
 ```
@@ -315,7 +366,173 @@ infra_add_host(hostname="web-prod", ip="10.0.0.5", user="deploy", location="exte
 infra_add_service(hostname="web-prod", service_name="myapp", env="prod", service_type="docker")
 infra_list_hosts(location="extern")
 infra_show_host(hostname="web-prod")
+infra_edit_service(hostname="web-prod", service_name="myapp", health_url="https://web-prod/health")
+infra_delete_host(hostname="old-staging", force=true)   # also removes its services
 ```
+
+---
+
+## Now (sprint backlog)
+
+A curated cross-project shortlist of what's actively in flight. Three
+active buckets (`today` / `week` / `later`) plus a 24h `done` holding
+bucket. Each bucket has a configurable WIP limit (defaults 7 / 20 / 50)
+so the list stays tight instead of accumulating like a generic TODO
+list. Items can either stand alone or reference an existing CM entity;
+the listing JOINs on the referenced table so callers see the live
+status of the linked entity (e.g. a referenced TODO that has since been
+closed).
+
+### `now_add`
+
+Add an item to the Now list. Refuses to add when the bucket's WIP limit
+is reached - move or remove an existing item first.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | string | Yes | - | Short, action-oriented title (max 200 chars) |
+| `bucket` | string | No | `today` | Enum: `today`, `week`, `later` |
+| `project` | string | No | - | Project name (cross-project is fine) |
+| `link_type` | string | No | - | Optional CM entity type. Enum: `todo`, `action`, `note`, `snippet`, `ai_instruction`, `host`, `service` |
+| `link_id` | integer\|string | No | - | ID of the linked entity (required when `link_type` is set) |
+
+### `now_list`
+
+List Now items ordered by bucket and position. Returns JSON `{items, counts, limits}`.
+Each item carries a `linked` payload with live status when it references an
+existing CM entity. `counts` is always returned for all four buckets so the UI
+can render a capacity overview independently of any filter.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `bucket` | string | No | - | Filter by bucket. Enum: `today`, `week`, `later`, `done` |
+| `project` | string | No | - | Filter by project |
+| `include_done` | boolean | No | false | Include the `done` holding bucket |
+
+### `now_show`
+
+Show a single Now item including its linked-entity payload (if any).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | integer\|string | Yes | Now item ID |
+
+### `now_move`
+
+Move an item between active buckets. Respects the target bucket's WIP limit.
+Use `now_done` to finish an item (the `done` bucket cannot be a `now_move` target).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | integer\|string | Yes | Now item ID |
+| `to_bucket` | string | Yes | Enum: `today`, `week`, `later` |
+
+### `now_done`
+
+Mark an item as done. It moves into the `done` holding bucket and is
+hard-deleted automatically 24h later (lazy GC on the next `now_list` call).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | integer\|string | Yes | Now item ID to complete |
+
+### `now_remove`
+
+Hard-delete a Now item. Use this to drop something off the list entirely
+(rather than finishing it via `now_done`).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | integer\|string | Yes | Now item ID to delete |
+
+### `now_reorder`
+
+Rewrite the order of items in a bucket (e.g. after drag-and-drop in the GUI).
+`ordered_ids` must list every item currently in the bucket exactly once -
+the call is rejected if the set doesn't match.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `bucket` | string | Yes | Enum: `today`, `week`, `later`, `done` |
+| `ordered_ids` | array[integer] | Yes | Item IDs in the new order |
+
+### `now_settings_get`
+
+Return the current WIP limits for `today` / `week` / `later` as JSON.
+
+*No parameters.*
+
+### `now_settings_set`
+
+Update one or more bucket WIP limits (range 1-100). Only provided values
+are changed. Returns the resulting settings.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `today` | integer | No | New limit for `today` |
+| `week` | integer | No | New limit for `week` |
+| `later` | integer | No | New limit for `later` |
+
+**Example:**
+
+```
+# A free-form item plus one that references an existing TODO
+now_add(title="Fix DSGVO footer link", bucket="today", project="myapp")
+now_add(title="Polish settings dialog", link_type="todo", link_id=42)
+
+now_list()
+# → JSON with items grouped by bucket, plus counts and limits.
+#   The linked item shows the TODO's live status (open / done / cancelled).
+
+now_move(item_id=5, to_bucket="week")
+now_done(item_id=5)        # → moved to 'done', auto-purged after 24h
+now_remove(item_id=7)      # → dropped entirely (not "finished")
+
+now_settings_set(today=5)  # tighten the today bucket
+```
+
+### Response shape (now_list)
+
+```json
+{
+  "items": [
+    {
+      "id": 5,
+      "bucket": "today",
+      "title": "Fix DSGVO footer link",
+      "project": "myapp",
+      "position": 0,
+      "created_at": "2026-05-23T10:00:00",
+      "moved_to_bucket_at": "2026-05-23T10:00:00",
+      "done_at": null,
+      "linked": null
+    },
+    {
+      "id": 6,
+      "bucket": "today",
+      "title": "Polish settings dialog",
+      "project": null,
+      "position": 1,
+      "linked": {
+        "type": "todo",
+        "id": 42,
+        "exists": true,
+        "status": "in_progress",
+        "summary": "Settings dialog needs a save-confirmed toast",
+        "closed_at": null
+      }
+    }
+  ],
+  "counts": { "today": 2, "week": 0, "later": 0, "done": 0 },
+  "limits": { "today": 7, "week": 20, "later": 50 }
+}
+```
+
+- `items` is sorted by `(bucket, position, id)` - render top-down without
+  re-sorting.
+- `linked: null` for free-form items.
+- `linked.exists: false` when the referenced entity has been deleted - UI
+  should flag it visually.
 
 ---
 
@@ -439,9 +656,22 @@ article_research(topic="PostgreSQL", save_as_note=true)
 | 23 | `infra_search` | Infra | Search infrastructure |
 | 24 | `infra_add_host` | Infra | Add SSH host |
 | 25 | `infra_add_service` | Infra | Add service to host |
-| 26 | `note_save` | Notes | Save a note |
-| 27 | `note_search` | Notes | Search notes |
-| 28 | `note_show` | Notes | Show full note |
-| 29 | `note_edit` | Notes | Edit a note |
-| 30 | `note_delete` | Notes | Delete a note |
-| 31 | `article_research` | Research | Research topic across CM |
+| 26 | `infra_edit_host` | Infra | Update host fields |
+| 27 | `infra_delete_host` | Infra | Delete a host |
+| 28 | `infra_edit_service` | Infra | Update service fields |
+| 29 | `infra_delete_service` | Infra | Delete a service |
+| 30 | `note_save` | Notes | Save a note |
+| 31 | `note_search` | Notes | Search notes |
+| 32 | `note_show` | Notes | Show full note |
+| 33 | `note_edit` | Notes | Edit a note |
+| 34 | `note_delete` | Notes | Delete a note |
+| 35 | `now_add` | Now | Add item to sprint backlog |
+| 36 | `now_list` | Now | List items (returns JSON) |
+| 37 | `now_show` | Now | Show single item with link payload |
+| 38 | `now_move` | Now | Move item between buckets |
+| 39 | `now_done` | Now | Mark item done (24h holding) |
+| 40 | `now_remove` | Now | Hard-delete an item |
+| 41 | `now_reorder` | Now | Reorder items in a bucket |
+| 42 | `now_settings_get` | Now | Read WIP limits |
+| 43 | `now_settings_set` | Now | Update WIP limits |
+| 44 | `article_research` | Research | Research topic across CM |
