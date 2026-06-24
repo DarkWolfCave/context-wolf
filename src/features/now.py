@@ -241,13 +241,24 @@ class NowManager:
         linked_id: Optional[int] = None,
     ) -> int:
         """Create a new Now item. Raises NowLimitExceeded when the bucket is full."""
-        title = self.validator.clean_text(title, max_length=self.MAX_TITLE_LENGTH)
+        # Clean WITHOUT truncating: pass the raw length as the cap so
+        # clean_text never silently chops the title. An over-long title is a
+        # caller error we reject loudly below - never a data-eating no-op.
+        # Now items have no body field, so a silently truncated title would
+        # lose everything past the cutoff with no warning.
+        raw = title or ""
+        title = self.validator.clean_text(raw, max_length=len(raw))
         # Now items are single-line by contract - collapse anything multi-
-        # line so a title can't render across multiple visual rows in the UI
-        # (which would also bypass the 200-char visible limit).
+        # line so a title can't render across multiple visual rows in the UI.
         title = title.replace("\n", " ").replace("\r", " ").strip()
         if not title:
             raise ValueError("Now item title cannot be empty")
+        if len(title) > self.MAX_TITLE_LENGTH:
+            raise ValueError(
+                f"Now item title is {len(title)} chars (max "
+                f"{self.MAX_TITLE_LENGTH}). Keep Now titles single-line; put "
+                f"long detail in a note and link it (link_type='note')."
+            )
 
         bucket = self._validate_active_bucket(bucket)
         linked_type, linked_id = self._validate_link(linked_type, linked_id)

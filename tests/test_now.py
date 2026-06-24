@@ -125,6 +125,23 @@ class TestNowManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.nm.add_item(title="   ", bucket="today")
 
+    def test_add_overlong_title_rejected_not_truncated(self):
+        # An over-long title must be rejected loudly, never silently chopped
+        # to MAX_TITLE_LENGTH - Now items have no body, so a truncated title
+        # would lose everything past the cutoff for good.
+        too_long = "A" * (self.nm.MAX_TITLE_LENGTH + 50)
+        with self.assertRaises(ValueError):
+            self.nm.add_item(title=too_long, bucket="today")
+        # And nothing was persisted as a side effect of the rejection.
+        self.assertEqual(self.nm._count_bucket("today"), 0)
+
+    def test_add_title_at_limit_accepted(self):
+        exact = "B" * self.nm.MAX_TITLE_LENGTH
+        item_id = self._add(title=exact, bucket="today")
+        item = self.nm.get_item(item_id)
+        self.assertEqual(item["title"], exact)
+        self.assertEqual(len(item["title"]), self.nm.MAX_TITLE_LENGTH)
+
     # ------------------ move ------------------
 
     def test_move_between_active_buckets(self):

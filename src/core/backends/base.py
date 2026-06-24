@@ -54,16 +54,6 @@ class DatabaseBackend(ABC):
         return '%s'
 
     @abstractmethod
-    def setup_schema(self) -> None:
-        """Create database schema (tables, indexes, etc.)"""
-        pass
-
-    @abstractmethod
-    def setup_fts(self) -> None:
-        """Setup full-text search (tsvector triggers)"""
-        pass
-
-    @abstractmethod
     def full_text_search(self, table: str, query: str, columns: List[str]) -> List[Dict]:
         """Perform full-text search on specified table."""
         pass

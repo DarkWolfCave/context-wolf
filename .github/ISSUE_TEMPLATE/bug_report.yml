@@ -1,0 +1,72 @@
+name: 🐛 Bug Report
+description: Something is broken or behaves unexpectedly
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! The more detail you
+        provide, the faster we can help.
+
+  - type: input
+    id: version
+    attributes:
+      label: ContextWolf version
+      description: "Run: `cm --version` (e.g. v5.1.0)"
+      placeholder: "v5.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "When I run `cm context_save ...`, X happens instead of Y…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. `cm …`
+        2. Inspect output / database
+        3. See error / wrong result
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - OS:
+        - Python version (`python3 --version`):
+        - PostgreSQL version (`psql --version` or container tag):
+        - Install method: pip / docker / source:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      description: |
+        For CLI errors: paste the command and its output.
+        For MCP errors: paste the MCP server log lines around the failure.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Database state, config snippets, screenshots — anything else relevant.

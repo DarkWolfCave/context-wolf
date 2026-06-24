@@ -2,6 +2,24 @@
 
 All notable changes to ContextWolf will be documented in this file.
 
+## [Unreleased]
+
+## [5.1.2] - 2026-06-24
+
+### Fixed
+- **Now item titles are no longer silently truncated.** A title longer than
+  the 200-character limit was quietly cut to fit, discarding everything past
+  the cutoff. Since Now items have no body field, that text was lost with no
+  warning. Over-long titles are now rejected with a clear error that reports
+  the actual length and suggests linking a note for long detail. The
+  200-character single-line limit itself is unchanged.
+
+### Internal
+- Removed the dead `setup_schema()` / `setup_fts()` methods from the database
+  backend (PostgreSQL implementation + abstract declarations). They were never
+  called; schema creation runs exclusively through the migrator
+  (`run_migrations`). No behaviour change.
+
 ## [5.1.1] - 2026-06-07
 
 ### Fixed

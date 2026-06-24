@@ -73,7 +73,7 @@ def run_migrations(backend) -> int:
     ensure_migration_table(backend)
 
     # If this is an existing database but has no migration records,
-    # mark 001 as already applied (those tables exist from setup_schema)
+    # mark 001 as already applied (those tables already exist on a pre-migrator database)
     applied = get_applied_migrations(backend)
     if not applied and is_existing_database(backend):
         logger.info("📋 Existing database detected - marking migration 001 as applied")

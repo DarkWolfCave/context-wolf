@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🎓 Wolf Academy — Courses on ContextWolf & MCP
+    url: https://academy.wolfcoder.de
+    about: Looking for the Web UI? It ships as part of the matching Wolf Academy course (German).
+  - name: 🌐 ContextWolf UI (Web GUI issue tracker)
+    url: https://github.com/DarkWolfCave/context-wolf-ui/issues
+    about: Bug or feature for the Web UI (not the CLI / MCP server)? File it there.
