@@ -232,6 +232,30 @@ class NowManager:
     # public CRUD
     # ------------------------------------------------------------------
 
+    def _clean_title(self, title: str) -> str:
+        """Validate and normalise a Now item title (shared by add + edit).
+
+        Cleans WITHOUT truncating - pass the raw length as the cap so
+        clean_text never silently chops the title. An over-long title is a
+        caller error we reject loudly, never a data-eating no-op: Now items
+        have no body field, so a silently truncated title would lose
+        everything past the cutoff with no warning.
+        """
+        raw = title or ""
+        cleaned = self.validator.clean_text(raw, max_length=len(raw))
+        # Now items are single-line by contract - collapse anything multi-
+        # line so a title can't render across multiple visual rows in the UI.
+        cleaned = cleaned.replace("\n", " ").replace("\r", " ").strip()
+        if not cleaned:
+            raise ValueError("Now item title cannot be empty")
+        if len(cleaned) > self.MAX_TITLE_LENGTH:
+            raise ValueError(
+                f"Now item title is {len(cleaned)} chars (max "
+                f"{self.MAX_TITLE_LENGTH}). Keep Now titles single-line; put "
+                f"long detail in a note and link it (link_type='note')."
+            )
+        return cleaned
+
     def add_item(
         self,
         title: str,
@@ -241,24 +265,7 @@ class NowManager:
         linked_id: Optional[int] = None,
     ) -> int:
         """Create a new Now item. Raises NowLimitExceeded when the bucket is full."""
-        # Clean WITHOUT truncating: pass the raw length as the cap so
-        # clean_text never silently chops the title. An over-long title is a
-        # caller error we reject loudly below - never a data-eating no-op.
-        # Now items have no body field, so a silently truncated title would
-        # lose everything past the cutoff with no warning.
-        raw = title or ""
-        title = self.validator.clean_text(raw, max_length=len(raw))
-        # Now items are single-line by contract - collapse anything multi-
-        # line so a title can't render across multiple visual rows in the UI.
-        title = title.replace("\n", " ").replace("\r", " ").strip()
-        if not title:
-            raise ValueError("Now item title cannot be empty")
-        if len(title) > self.MAX_TITLE_LENGTH:
-            raise ValueError(
-                f"Now item title is {len(title)} chars (max "
-                f"{self.MAX_TITLE_LENGTH}). Keep Now titles single-line; put "
-                f"long detail in a note and link it (link_type='note')."
-            )
+        title = self._clean_title(title)
 
         bucket = self._validate_active_bucket(bucket)
         linked_type, linked_id = self._validate_link(linked_type, linked_id)
@@ -327,6 +334,30 @@ class NowManager:
         )
         self.conn.commit()
         return {"id": item_id, "bucket": to_bucket, "moved": True, "from": old_bucket}
+
+    def edit_title(self, item_id: int, title: str) -> Dict[str, Any]:
+        """Rename an existing Now item in place.
+
+        Title-only by design: bucket changes go through move_item, status
+        through mark_done/remove_item. Editing avoids the delete+re-add
+        workaround, which silently resets position, created_at and the
+        linked-entity reference. Reuses the same title validation as add_item.
+        """
+        title = self._clean_title(title)
+
+        cursor = self.conn.cursor()
+        row = cursor.execute(
+            "SELECT title FROM now_items WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Now item #{item_id} not found")
+
+        cursor.execute(
+            "UPDATE now_items SET title = ? WHERE id = ?",
+            (title, item_id),
+        )
+        self.conn.commit()
+        return {"id": item_id, "title": title}
 
     def mark_done(self, item_id: int) -> bool:
         """Move an item into the `done` holding bucket."""

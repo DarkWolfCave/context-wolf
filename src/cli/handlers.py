@@ -1943,7 +1943,7 @@ class CommandHandlers:
         """Handle 'now' command with subcommands."""
         if not getattr(args, 'now_command', None):
             print("❌ No 'now' subcommand specified")
-            print("Available: add, list, show, move, done, remove, reorder, settings")
+            print("Available: add, list, show, move, edit, done, remove, reorder, settings")
             return
 
         sub_handlers = {
@@ -1951,6 +1951,7 @@ class CommandHandlers:
             'list': self._now_list,
             'show': self._now_show,
             'move': self._now_move,
+            'edit': self._now_edit,
             'done': self._now_done,
             'remove': self._now_remove,
             'reorder': self._now_reorder,
@@ -2048,6 +2049,13 @@ class CommandHandlers:
                 print(f"ℹ️  Now item #{args.id} already in '{args.bucket}'")
         except NowLimitExceeded as e:
             print(f"❌ Bucket '{e.bucket}' is full ({e.current}/{e.limit})")
+        except ValueError as e:
+            print(f"❌ {e}")
+
+    def _now_edit(self, args):
+        try:
+            result = self.now.edit_title(args.id, args.title)
+            print(f"✅ Now item #{args.id} renamed: {result['title']}")
         except ValueError as e:
             print(f"❌ {e}")
 

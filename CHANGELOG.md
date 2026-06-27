@@ -4,6 +4,27 @@ All notable changes to ContextWolf will be documented in this file.
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-06-27
+
+### Added
+- **Delete context entries via MCP.** New `context_delete` MCP tool removes a
+  single context entry (action plus its content, metadata and relations) by ID.
+  The delete capability already existed in the backend (`delete_entry`) and CLI
+  (`cm delete`); only the MCP surface was missing, leaving context entries the
+  odd entity out next to notes, now-items and infra, which all expose delete.
+  The tool is deliberately ID-only - there is no delete-by-query - to prevent a
+  single call from wiping many entries. Context entries remain non-editable in
+  place by design: to correct a wrong entry, delete it and `context_save` a
+  corrected one, which keeps the entry log a record of what was actually saved
+  rather than a silently-rewritten surface. (No `context_edit` is provided.)
+- **Rename Now items in place.** New `cm now edit <id> <title>` subcommand and
+  `now_edit` MCP tool. Previously a title could only be changed by deleting the
+  item and re-adding it, which silently reset its position, creation time and
+  linked-entity reference. Editing is title-only by design (bucket changes go
+  through `move`, status through `done`/`remove`) and reuses the same title
+  validation as `add`, so the single-line 200-character limit is enforced the
+  same way on both paths.
+
 ## [5.1.2] - 2026-06-24
 
 ### Fixed

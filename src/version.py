@@ -13,6 +13,7 @@ V5.0.0: Rebranded to ContextWolf, Python Package (pyproject.toml), SQLite remova
 V5.1.0: "Now" Sprint Backlog (cross-project today/week/later with WIP limits)
 V5.1.1: Schema reconciliation - fresh installs get the complete schema
 V5.1.2: Now titles - reject over-long titles instead of silently truncating
+V5.2.0: now_edit (rename Now items in place) + context_delete MCP tool
 """
 
-__version__ = "5.1.2"
+__version__ = "5.2.0"

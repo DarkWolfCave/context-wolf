@@ -166,6 +166,37 @@ class TestNowManager(unittest.TestCase):
         self.assertEqual(item["bucket"], "done")
         self.assertIsNotNone(item["done_at"])
 
+    # ------------------ edit ------------------
+
+    def test_edit_title_renames_in_place(self):
+        item_id = self._add(title="Old title", bucket="today")
+        result = self.nm.edit_title(item_id, "New title")
+        self.assertEqual(result["title"], "New title")
+        item = self.nm.get_item(item_id)
+        self.assertEqual(item["title"], "New title")
+        # In place: same id, same bucket - no delete+re-add side effects.
+        self.assertEqual(item["id"], item_id)
+        self.assertEqual(item["bucket"], "today")
+
+    def test_edit_title_unknown_item_rejected(self):
+        with self.assertRaises(ValueError):
+            self.nm.edit_title(999999, "whatever")
+
+    def test_edit_title_empty_rejected(self):
+        item_id = self._add(title="Keep me", bucket="today")
+        with self.assertRaises(ValueError):
+            self.nm.edit_title(item_id, "   ")
+        # Original title untouched after a rejected edit.
+        self.assertEqual(self.nm.get_item(item_id)["title"], "Keep me")
+
+    def test_edit_title_overlong_rejected_not_truncated(self):
+        item_id = self._add(title="Short", bucket="today")
+        too_long = "Z" * (self.nm.MAX_TITLE_LENGTH + 10)
+        with self.assertRaises(ValueError):
+            self.nm.edit_title(item_id, too_long)
+        # Same validation as add_item - no silent truncation on edit either.
+        self.assertEqual(self.nm.get_item(item_id)["title"], "Short")
+
     # ------------------ limits ------------------
 
     def _bucket_count(self, bucket: str) -> int:

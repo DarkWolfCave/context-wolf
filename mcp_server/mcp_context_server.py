@@ -167,7 +167,7 @@ def get_mgr(ctx: Context, name: str):
     return ctx.request_context.lifespan_context[name]
 
 
-# ========== CONTEXT MANAGEMENT (4 tools) ==========
+# ========== CONTEXT MANAGEMENT (5 tools) ==========
 
 @mcp.tool()
 @tracked
@@ -260,6 +260,23 @@ def context_show(
         f"{'=' * 40}\n"
         f"{content_str}"
     )
+
+
+@mcp.tool()
+@tracked
+def context_delete(
+    entry_id: Union[int, str] = Field(description="The single context entry ID to delete (deletes the action and its content/metadata/relations). No bulk or query-based deletion - one explicit ID at a time."),
+    ctx: Context = None,
+) -> str:
+    """Delete a single context entry by ID. Irreversible: removes the action plus its content, metadata and relations. Requires an explicit entry ID - there is intentionally no delete-by-query to prevent accidental mass deletion. To fix a wrong entry, delete it and context_save a corrected one (context entries are not edited in place)."""
+    am = get_mgr(ctx, "action_manager")
+    entry = am.get_entry(int(entry_id))
+    if not entry:
+        return f"Entry #{entry_id} not found - nothing deleted"
+
+    summary = (entry.get("content") or entry.get("summary") or "")[:60]
+    am.delete_entry(int(entry_id), silent=True)
+    return f"Deleted entry #{entry_id} [{entry['type']}] from '{entry['project']}': {summary}"
 
 
 # ========== SNIPPET MANAGEMENT (4 tools) ==========
@@ -1078,6 +1095,22 @@ def now_move(
     if not result.get("moved"):
         return f"Now item #{item_id} already in '{to_bucket}'"
     return f"Now item #{item_id}: {result['from']} -> {result['bucket']}"
+
+
+@mcp.tool()
+@tracked
+def now_edit(
+    item_id: Union[int, str] = Field(description="Now item ID"),
+    title: str = Field(description="New title (max 200 chars, single-line)"),
+    ctx: Context = None,
+) -> str:
+    """Rename a Now item in place. Title-only: use now_move for the bucket and now_done/now_remove for status. Avoids the delete+re-add workaround, which would reset position, created_at and the linked-entity reference."""
+    nm = get_mgr(ctx, "now_manager")
+    try:
+        result = nm.edit_title(int(item_id), title)
+    except ValueError as e:
+        return f"{e}"
+    return f"Now item #{item_id} renamed: {result['title']}"
 
 
 @mcp.tool()

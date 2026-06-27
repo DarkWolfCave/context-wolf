@@ -577,6 +577,11 @@ def _add_now_commands(subparsers):
     n_move.add_argument('bucket', choices=['today', 'week', 'later'],
                         help='target bucket')
 
+    # now edit
+    n_edit = now_sub.add_parser('edit', help='rename a Now item in place')
+    n_edit.add_argument('id', type=int, help='Now item ID')
+    n_edit.add_argument('title', help='new title (max 200 chars)')
+
     # now done
     n_done = now_sub.add_parser('done', help='mark a Now item as done')
     n_done.add_argument('id', type=int, help='Now item ID')

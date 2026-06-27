@@ -1,6 +1,6 @@
 # ContextWolf V5.1.0 - MCP Tools Reference
 
-Complete reference for all 44 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
+Complete reference for all 46 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
 
 ---
 
@@ -50,6 +50,21 @@ Show full content of a specific context entry by ID. Use after `context_search` 
 context_search(query="docker config", project="current")
 # → entry #42 looks relevant
 context_show(entry_id=42)
+```
+
+### `context_delete`
+
+Delete a single context entry by ID. **Irreversible** - removes the action plus its content, metadata and relations. Requires an explicit entry ID; there is intentionally no delete-by-query to prevent accidental mass deletion. Context entries are not edited in place - to correct a wrong entry, delete it and `context_save` a corrected one.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entry_id` | integer\|string | Yes | The single context entry ID to delete |
+
+**Example:**
+
+```
+context_delete(entry_id=42)
+# → Deleted entry #42 [decision] from 'context-wolf': ...
 ```
 
 ---
@@ -427,6 +442,19 @@ Use `now_done` to finish an item (the `done` bucket cannot be a `now_move` targe
 | `item_id` | integer\|string | Yes | Now item ID |
 | `to_bucket` | string | Yes | Enum: `today`, `week`, `later` |
 
+### `now_edit`
+
+Rename a Now item in place. Title-only by design: the bucket changes via
+`now_move`, status via `now_done` / `now_remove`. Use this instead of
+deleting and re-adding an item to fix a title - delete+re-add would reset
+the item's position, creation time and linked-entity reference. The same
+single-line 200-character title rule as `now_add` applies.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | integer\|string | Yes | Now item ID |
+| `title` | string | Yes | New title (max 200 chars, single-line) |
+
 ### `now_done`
 
 Mark an item as done. It moves into the `done` holding bucket and is
@@ -485,6 +513,7 @@ now_list()
 #   The linked item shows the TODO's live status (open / done / cancelled).
 
 now_move(item_id=5, to_bucket="week")
+now_edit(item_id=5, title="Fix DSGVO footer link (impressum too)")  # rename in place
 now_done(item_id=5)        # → moved to 'done', auto-purged after 24h
 now_remove(item_id=7)      # → dropped entirely (not "finished")
 
@@ -635,43 +664,45 @@ article_research(topic="PostgreSQL", save_as_note=true)
 | 2 | `context_move` | Context | Move entry to another project |
 | 3 | `context_search` | Context | Search context database |
 | 4 | `context_show` | Context | Show full context entry |
-| 5 | `snippet_search` | Snippets | Search code snippets |
-| 6 | `snippet_show` | Snippets | Show full snippet |
-| 7 | `snippet_add` | Snippets | Add a code snippet |
-| 8 | `snippet_list` | Snippets | List all snippets |
-| 9 | `todo_add` | TODO | Add a task |
-| 10 | `todo_list` | TODO | List tasks |
-| 11 | `todo_start` | TODO | Start a task |
-| 12 | `todo_done` | TODO | Complete a task |
-| 13 | `todo_show` | TODO | Show task details |
-| 14 | `todo_reopen` | TODO | Reopen a task |
-| 15 | `todo_cancel` | TODO | Cancel a task |
-| 16 | `session` | Core | Show session info |
-| 17 | `stats` | Core | Show project statistics |
-| 18 | `projects` | Core | List all projects |
-| 19 | `ai_prompt` | Core | Generate AI session prompt |
-| 20 | `infra_list_hosts` | Infra | List SSH hosts |
-| 21 | `infra_show_host` | Infra | Show host details |
-| 22 | `infra_list_services` | Infra | List services |
-| 23 | `infra_search` | Infra | Search infrastructure |
-| 24 | `infra_add_host` | Infra | Add SSH host |
-| 25 | `infra_add_service` | Infra | Add service to host |
-| 26 | `infra_edit_host` | Infra | Update host fields |
-| 27 | `infra_delete_host` | Infra | Delete a host |
-| 28 | `infra_edit_service` | Infra | Update service fields |
-| 29 | `infra_delete_service` | Infra | Delete a service |
-| 30 | `note_save` | Notes | Save a note |
-| 31 | `note_search` | Notes | Search notes |
-| 32 | `note_show` | Notes | Show full note |
-| 33 | `note_edit` | Notes | Edit a note |
-| 34 | `note_delete` | Notes | Delete a note |
-| 35 | `now_add` | Now | Add item to sprint backlog |
-| 36 | `now_list` | Now | List items (returns JSON) |
-| 37 | `now_show` | Now | Show single item with link payload |
-| 38 | `now_move` | Now | Move item between buckets |
-| 39 | `now_done` | Now | Mark item done (24h holding) |
-| 40 | `now_remove` | Now | Hard-delete an item |
-| 41 | `now_reorder` | Now | Reorder items in a bucket |
-| 42 | `now_settings_get` | Now | Read WIP limits |
-| 43 | `now_settings_set` | Now | Update WIP limits |
-| 44 | `article_research` | Research | Research topic across CM |
+| 5 | `context_delete` | Context | Delete a single context entry |
+| 6 | `snippet_search` | Snippets | Search code snippets |
+| 7 | `snippet_show` | Snippets | Show full snippet |
+| 8 | `snippet_add` | Snippets | Add a code snippet |
+| 9 | `snippet_list` | Snippets | List all snippets |
+| 10 | `todo_add` | TODO | Add a task |
+| 11 | `todo_list` | TODO | List tasks |
+| 12 | `todo_start` | TODO | Start a task |
+| 13 | `todo_done` | TODO | Complete a task |
+| 14 | `todo_show` | TODO | Show task details |
+| 15 | `todo_reopen` | TODO | Reopen a task |
+| 16 | `todo_cancel` | TODO | Cancel a task |
+| 17 | `session` | Core | Show session info |
+| 18 | `stats` | Core | Show project statistics |
+| 19 | `projects` | Core | List all projects |
+| 20 | `ai_prompt` | Core | Generate AI session prompt |
+| 21 | `infra_list_hosts` | Infra | List SSH hosts |
+| 22 | `infra_show_host` | Infra | Show host details |
+| 23 | `infra_list_services` | Infra | List services |
+| 24 | `infra_search` | Infra | Search infrastructure |
+| 25 | `infra_add_host` | Infra | Add SSH host |
+| 26 | `infra_add_service` | Infra | Add service to host |
+| 27 | `infra_edit_host` | Infra | Update host fields |
+| 28 | `infra_delete_host` | Infra | Delete a host |
+| 29 | `infra_edit_service` | Infra | Update service fields |
+| 30 | `infra_delete_service` | Infra | Delete a service |
+| 31 | `note_save` | Notes | Save a note |
+| 32 | `note_search` | Notes | Search notes |
+| 33 | `note_show` | Notes | Show full note |
+| 34 | `note_edit` | Notes | Edit a note |
+| 35 | `note_delete` | Notes | Delete a note |
+| 36 | `now_add` | Now | Add item to sprint backlog |
+| 37 | `now_list` | Now | List items (returns JSON) |
+| 38 | `now_show` | Now | Show single item with link payload |
+| 39 | `now_move` | Now | Move item between buckets |
+| 40 | `now_edit` | Now | Rename an item in place (title-only) |
+| 41 | `now_done` | Now | Mark item done (24h holding) |
+| 42 | `now_remove` | Now | Hard-delete an item |
+| 43 | `now_reorder` | Now | Reorder items in a bucket |
+| 44 | `now_settings_get` | Now | Read WIP limits |
+| 45 | `now_settings_set` | Now | Update WIP limits |
+| 46 | `article_research` | Research | Research topic across CM |

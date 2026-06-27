@@ -216,7 +216,7 @@ After running `cm setup-mcp`, ContextWolf registers itself in `~/.claude.json` a
 | Context | `context_save`, `context_search`, `context_show`, `context_move` |
 | Notes | `note_save`, `note_search`, `note_show`, `note_edit`, `note_delete` |
 | TODOs | `todo_add`, `todo_list`, `todo_start`, `todo_done`, `todo_show`, `todo_reopen`, `todo_cancel` |
-| Now | `now_add`, `now_list`, `now_show`, `now_move`, `now_done`, `now_remove`, `now_reorder`, `now_settings_get`, `now_settings_set` |
+| Now | `now_add`, `now_list`, `now_show`, `now_move`, `now_edit`, `now_done`, `now_remove`, `now_reorder`, `now_settings_get`, `now_settings_set` |
 | Infrastructure | `infra_list_hosts`, `infra_show_host`, `infra_list_services`, `infra_search`, `infra_add_host`, `infra_add_service`, `infra_edit_host`, `infra_delete_host`, `infra_edit_service`, `infra_delete_service` |
 | Snippets | `snippet_search`, `snippet_show`, `snippet_add`, `snippet_list` |
 | Meta | `session`, `stats`, `projects`, `ai_prompt`, `article_research` |
