@@ -3,7 +3,7 @@
 MCP Server for ContextWolf - Claude Code Integration
 Provides direct integration with Claude Code via Model Context Protocol
 
-Migrated to FastMCP (high-level API) from low-level Server API.
+Uses the MCPServer high-level API (mcp SDK v2; formerly FastMCP in v1).
 """
 
 import json
@@ -16,7 +16,7 @@ from typing import Optional, Union, Literal
 from contextlib import asynccontextmanager
 from pydantic import Field
 
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.mcpserver import MCPServer, Context
 
 # Import ContextWolf core
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -46,7 +46,7 @@ logger = logging.getLogger("mcp-context")
 # --- Lifespan: DB + Manager initialization/cleanup ---
 
 @asynccontextmanager
-async def lifespan(app: FastMCP):
+async def lifespan(app: MCPServer):
     """Initialize database and managers on startup, cleanup on shutdown."""
     config = Config()
     db = Database(config=config)
@@ -90,9 +90,9 @@ async def lifespan(app: FastMCP):
     logger.info("Server shutdown complete")
 
 
-# --- FastMCP Server ---
+# --- MCPServer ---
 
-mcp = FastMCP(
+mcp = MCPServer(
     "context-wolf",
     lifespan=lifespan,
 )
@@ -931,22 +931,103 @@ def note_search(
 @tracked
 def note_show(
     note_id: Union[int, str] = Field(description="Note ID to show"),
+    start_line: Optional[int] = Field(default=None, description="Optional: first line to show (1-based). Use with end_line to read only part of a large note and save tokens."),
+    end_line: Optional[int] = Field(default=None, description="Optional: last line to show (1-based, inclusive). Defaults to end of note."),
     ctx: Context = None,
 ) -> str:
-    """Show full content of a specific note by ID."""
+    """Show a note by ID. Without start_line/end_line, returns the full note. Provide either bound to read only a line range - useful for large notes where you want to inspect a section without pulling the whole thing into context. Line numbers match note_grep output."""
     nm = get_mgr(ctx, "notes_manager")
-    note = nm.get_note(int(note_id))
+    nid = int(note_id)
+
+    ranged = start_line is not None or end_line is not None
+    if ranged:
+        try:
+            note = nm.get_note_slice(nid, start_line=start_line, end_line=end_line)
+        except ValueError as exc:
+            return f"Note #{note_id}: {exc}"
+    else:
+        note = nm.get_note(nid)
+
     if not note:
         return f"Note #{note_id} not found"
 
     project_str = f"Project: {note['project']}" if note.get("project") else "No project"
     tags_str = f"Tags: {note['tags']}" if note.get("tags") else ""
+    range_str = (
+        f"\nShowing lines {note['slice_start']}-{note['slice_end']} of {note['total_lines']}"
+        if ranged else ""
+    )
     return (
         f"Note #{note['id']}: {note['title']}\n"
         f"{project_str} | Created: {note.get('created_at', 'N/A')} | Updated: {note.get('updated_at', 'N/A')}\n"
-        f"{tags_str}\n"
+        f"{tags_str}{range_str}\n"
         f"{'=' * 40}\n"
         f"{note['content']}"
+    )
+
+
+@mcp.tool()
+@tracked
+def note_grep(
+    note_id: Union[int, str] = Field(description="Note ID to search within"),
+    pattern: str = Field(description="Regular expression, matched per line (re.search)"),
+    context: int = Field(default=2, description="Lines of context to show around each match (default: 2)"),
+    ignore_case: bool = Field(default=True, description="Case-insensitive match (default: True)"),
+    ctx: Context = None,
+) -> str:
+    """Search inside a single note and return only matching lines plus surrounding context, with line numbers. Use this to locate the exact text to feed into note_edit_string WITHOUT loading a large note in full. IMPORTANT: the 'NNN| ' line-number prefix is display only - do NOT include it in old_string when calling note_edit_string; copy only the text after the '| '."""
+    nm = get_mgr(ctx, "notes_manager")
+    try:
+        result = nm.grep_note(int(note_id), pattern, context=context, ignore_case=ignore_case)
+    except ValueError as exc:
+        return f"Note #{note_id}: {exc}"
+
+    if result["match_count"] == 0:
+        return f"Note #{note_id}: no lines match /{pattern}/ ({result['total_lines']} lines total)"
+
+    header = (
+        f"Note #{note_id}: {result['match_count']} matching line(s) "
+        f"of {result['total_lines']}"
+    )
+    if result["truncated"]:
+        header += " (showing first 50 matches)"
+
+    out = [header, "=" * 40]
+    for bi, block in enumerate(result["blocks"]):
+        if bi > 0:
+            out.append("--")
+        for ln in block["lines"]:
+            marker = ":" if ln["is_match"] else " "
+            out.append(f"{ln['n']:>4}{marker} {ln['text']}")
+    return "\n".join(out)
+
+
+@mcp.tool()
+@tracked
+def note_edit_string(
+    note_id: Union[int, str] = Field(description="Note ID to edit"),
+    old_string: str = Field(description="Exact literal text to find and replace. Include enough surrounding context to make it unique within the note. Do NOT include note_grep's 'NNN| ' line-number prefix."),
+    new_string: str = Field(description="Replacement text. May be empty to delete the matched span."),
+    replace_all: bool = Field(default=False, description="Replace every occurrence. Default False requires old_string to match exactly once (safer)."),
+    ctx: Context = None,
+) -> str:
+    """Surgically replace an exact substring in a note without rewriting the whole note. Token-efficient way to keep large notes current instead of appending correction blocks. Matching is literal (not regex). Fails if old_string is not found, or matches more than once while replace_all is False - add surrounding context or set replace_all=True. Use note_grep first to find the exact text."""
+    nm = get_mgr(ctx, "notes_manager")
+    try:
+        result = nm.replace_in_note(
+            int(note_id),
+            old_string=old_string,
+            new_string=new_string,
+            replace_all=replace_all,
+        )
+    except ValueError as exc:
+        return f"Note #{note_id}: {exc}"
+
+    where = f"{result['replaced']} occurrence(s)" if replace_all else "1 occurrence"
+    return (
+        f"Note #{note_id} updated: replaced {where} "
+        f"({result['old_length']} chars -> {len(new_string)} chars). "
+        f"Content now {result['content_length']} chars."
     )
 
 
@@ -1198,7 +1279,7 @@ def article_research(
 @mcp.resource("context://session/current")
 def current_session() -> str:
     """Today's context session."""
-    # Resources don't have ctx in FastMCP - use module-level access
+    # Resources don't have ctx in the high-level API - use module-level access
     # This is a limitation; for now return a placeholder
     return json.dumps({"info": "Use the session() tool for session data"})
 

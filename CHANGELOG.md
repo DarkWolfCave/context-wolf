@@ -4,6 +4,42 @@ All notable changes to ContextWolf will be documented in this file.
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-09-19
+
+### Added
+- **Surgical note editing.** New `note_edit_string` MCP tool replaces an exact
+  substring inside a note instead of rewriting the whole `content`. This
+  directly counters the append-culture that grows notes unbounded: a stale line
+  can be replaced in place rather than by appending a correction block. Matching
+  is literal (not regex) and mirrors an exact-match code editor - it refuses
+  when `old_string` is not found, or matches more than once while `replace_all`
+  is `False`, forcing the caller to add surrounding context or opt in explicitly.
+  Results exceeding the 500 KB content limit are refused, never silently
+  truncated. The replacement is computed in Python and written through the
+  normal parametrized `UPDATE`, so there is no SQL-injection surface.
+- **Search within a note.** New `note_grep` MCP tool returns only the matching
+  lines plus surrounding context (with 1-based line numbers, overlapping windows
+  merged), letting a caller locate the exact text to feed into `note_edit_string`
+  without pulling a large note into context. The line-number prefix is display
+  only and must not be copied into `old_string`.
+- **Partial note reads.** `note_show` gained optional `start_line` / `end_line`
+  parameters to return only a line range of a large note, using the same line
+  numbers as `note_grep`. Without them the full note is returned as before.
+
+  Together these turn a big note from an all-or-nothing load into something a
+  session can inspect and maintain a slice at a time - fewer tokens on read, and
+  a smaller blast radius than a whole-content rewrite on edit.
+
+### Changed
+- **Upgraded to the `mcp` Python SDK v2** (`~=1.0` -> `~=2.2`). In SDK v2 the
+  high-level server class `FastMCP` was renamed to `MCPServer` and moved to
+  `mcp.server.mcpserver`; the server now imports and instantiates `MCPServer`.
+  The tool and resource surface is unchanged - all tools keep their names,
+  parameters and generated schemas, and the stdio transport is unaffected - so
+  there is no change for MCP clients. Installing this release pulls SDK v2 and
+  its dependencies (notably `httpx2`, `opentelemetry-api` and `pydantic>=2.12`);
+  the minimum Python version is unchanged (>=3.10).
+
 ## [5.2.0] - 2026-06-27
 
 ### Added

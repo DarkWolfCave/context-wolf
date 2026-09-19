@@ -6,6 +6,7 @@ Replaces external tools like Obsidian for storing session context,
 migration plans, architecture decisions, and other structured knowledge.
 """
 
+import re
 from datetime import datetime
 from typing import List, Dict, Optional
 from ..core.database import Database
@@ -187,6 +188,215 @@ class NotesManager:
         """, (note_id,)).fetchone()
 
         return dict(row) if row else None
+
+    def replace_in_note(
+        self,
+        note_id: int,
+        old_string: str,
+        new_string: str,
+        replace_all: bool = False,
+    ) -> Dict:
+        """
+        Surgically replace an exact substring in a note's content.
+
+        This is the token-efficient alternative to update_note(content=...):
+        instead of rewriting the whole note, only the matched span changes.
+        String matching is exact (literal, not regex) and happens in Python;
+        the write itself goes through the normal parametrized UPDATE, so there
+        is no SQL-injection surface.
+
+        Safety rules (mirroring an exact-match code editor):
+        - old_string must be non-empty and differ from new_string
+        - 0 matches            -> ValueError (nothing to change)
+        - >1 matches & not replace_all -> ValueError (ambiguous; add context)
+        - result exceeding MAX_CONTENT_LENGTH -> ValueError (no silent truncation)
+
+        Args:
+            note_id: ID of note to edit
+            old_string: exact literal text to find (include surrounding
+                context to make it unique)
+            new_string: replacement text (may be empty to delete the span)
+            replace_all: replace every occurrence instead of requiring
+                exactly one
+
+        Returns:
+            Dict with {'replaced', 'old_length', 'content_length'}
+
+        Raises:
+            ValueError on any of the safety rules above or unknown note.
+        """
+        self._ensure_table()
+
+        note = self.get_note(note_id)
+        if not note:
+            raise ValueError(f"Note #{note_id} not found")
+
+        old_string = str(old_string)
+        new_string = str(new_string)
+
+        if old_string == "":
+            raise ValueError("old_string cannot be empty")
+        if old_string == new_string:
+            raise ValueError("old_string and new_string are identical - nothing to change")
+
+        content = note["content"] or ""
+        count = content.count(old_string)
+
+        if count == 0:
+            raise ValueError(
+                "old_string not found in note. Check whitespace/casing, or use "
+                "note_grep to locate the exact text."
+            )
+        if count > 1 and not replace_all:
+            raise ValueError(
+                f"old_string is not unique ({count} matches). Add surrounding "
+                f"context to target a single occurrence, or set replace_all=True."
+            )
+
+        if replace_all:
+            new_content = content.replace(old_string, new_string)
+            replaced = count
+        else:
+            new_content = content.replace(old_string, new_string, 1)
+            replaced = 1
+
+        if len(new_content) > self.MAX_CONTENT_LENGTH:
+            raise ValueError(
+                f"Resulting content would be {len(new_content)} chars, exceeding "
+                f"the {self.MAX_CONTENT_LENGTH} char limit. Edit refused (no truncation)."
+            )
+
+        self.update_note(note_id=note_id, content=new_content)
+        return {
+            "replaced": replaced,
+            "old_length": len(old_string),
+            "content_length": len(new_content),
+        }
+
+    def grep_note(
+        self,
+        note_id: int,
+        pattern: str,
+        context: int = 2,
+        ignore_case: bool = True,
+        max_matches: int = 50,
+    ) -> Dict:
+        """
+        Search within a single note and return only matching lines plus
+        surrounding context, with 1-based line numbers.
+
+        This lets a caller locate the exact text to feed into replace_in_note
+        WITHOUT pulling the whole (possibly huge) note into context. Overlapping
+        context windows are merged into contiguous blocks.
+
+        Args:
+            note_id: note to search
+            pattern: regular expression (re.search semantics, per line)
+            context: number of lines of context around each match
+            ignore_case: case-insensitive matching (default True)
+            max_matches: cap on matched lines; extras are reported, not silently
+                dropped
+
+        Returns:
+            Dict with keys:
+              'total_lines'  - line count of the note
+              'match_count'  - number of matching lines found (pre-cap)
+              'truncated'    - True if match_count exceeded max_matches
+              'blocks'       - list of {'lines': [{'n', 'text', 'is_match'}]}
+
+        Raises:
+            ValueError on unknown note or invalid regex.
+        """
+        self._ensure_table()
+
+        note = self.get_note(note_id)
+        if not note:
+            raise ValueError(f"Note #{note_id} not found")
+
+        try:
+            rx = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
+        except re.error as exc:
+            raise ValueError(f"Invalid regex pattern: {exc}")
+
+        lines = (note["content"] or "").split("\n")
+        total = len(lines)
+        context = max(0, int(context))
+
+        match_idx = [i for i, line in enumerate(lines) if rx.search(line)]
+        match_count = len(match_idx)
+        truncated = match_count > max_matches
+        used = match_idx[:max_matches]
+
+        # Build merged, sorted line ranges (0-based, inclusive) around matches.
+        ranges: List[List[int]] = []
+        for i in used:
+            lo, hi = max(0, i - context), min(total - 1, i + context)
+            if ranges and lo <= ranges[-1][1] + 1:
+                ranges[-1][1] = max(ranges[-1][1], hi)
+            else:
+                ranges.append([lo, hi])
+
+        match_set = set(used)
+        blocks = []
+        for lo, hi in ranges:
+            block_lines = [
+                {"n": j + 1, "text": lines[j], "is_match": j in match_set}
+                for j in range(lo, hi + 1)
+            ]
+            blocks.append({"lines": block_lines})
+
+        return {
+            "total_lines": total,
+            "match_count": match_count,
+            "truncated": truncated,
+            "blocks": blocks,
+        }
+
+    def get_note_slice(
+        self,
+        note_id: int,
+        start_line: Optional[int] = None,
+        end_line: Optional[int] = None,
+    ) -> Optional[Dict]:
+        """
+        Return a note plus a line-range slice of its content (1-based,
+        inclusive), for reading part of a large note without loading it whole.
+
+        Args:
+            note_id: note to read
+            start_line: first line (1-based, default 1)
+            end_line: last line inclusive (default: last line)
+
+        Returns:
+            Note dict (as get_note) augmented with 'content' replaced by the
+            slice, plus 'slice_start', 'slice_end', 'total_lines'. None if the
+            note does not exist.
+
+        Raises:
+            ValueError if the range is invalid.
+        """
+        note = self.get_note(note_id)
+        if not note:
+            return None
+
+        lines = (note["content"] or "").split("\n")
+        total = len(lines)
+
+        start = 1 if start_line is None else int(start_line)
+        end = total if end_line is None else int(end_line)
+
+        if start < 1:
+            raise ValueError("start_line must be >= 1")
+        if end < start:
+            raise ValueError(f"end_line ({end}) must be >= start_line ({start})")
+
+        start = min(start, total)
+        end = min(end, total)
+        note["content"] = "\n".join(lines[start - 1:end])
+        note["slice_start"] = start
+        note["slice_end"] = end
+        note["total_lines"] = total
+        return note
 
     def search_notes(
         self,

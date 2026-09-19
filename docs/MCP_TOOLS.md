@@ -1,6 +1,6 @@
 # ContextWolf V5.1.0 - MCP Tools Reference
 
-Complete reference for all 46 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
+Complete reference for all 48 MCP tools exposed by ContextWolf. Intended for developers using these tools via Claude Code.
 
 ---
 
@@ -591,11 +591,26 @@ Search project notes by keyword, project, or tags.
 
 ### `note_show`
 
-Show full content of a specific note by ID.
+Show a note by ID. Without a line range, returns the full note. Provide `start_line` and/or `end_line` to read only a section of a large note without pulling the whole thing into context. Line numbers match `note_grep` output.
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `note_id` | integer\|string | Yes | Note ID to show |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `note_id` | integer\|string | Yes | - | Note ID to show |
+| `start_line` | integer | No | 1 | First line to show (1-based) |
+| `end_line` | integer | No | end | Last line to show (1-based, inclusive) |
+
+### `note_grep`
+
+Search inside a single note and return only the matching lines plus surrounding context, with line numbers. Use it to locate the exact text for `note_edit_string` without loading a large note in full.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `note_id` | integer\|string | Yes | - | Note ID to search |
+| `pattern` | string | Yes | - | Regular expression, matched per line |
+| `context` | integer | No | 2 | Lines of context around each match |
+| `ignore_case` | boolean | No | true | Case-insensitive match |
+
+> The `NNN| ` line-number prefix in the output is display only. Do **not** include it in `old_string` when calling `note_edit_string` - copy only the text after the `| `.
 
 ### `note_edit`
 
@@ -608,6 +623,19 @@ Edit an existing note. Only provided fields are updated.
 | `content` | string | No | New content (replaces existing) |
 | `append` | string | No | Text to append to existing content |
 | `tags` | string | No | New tags |
+
+### `note_edit_string`
+
+Surgically replace an exact substring in a note without rewriting the whole note. The token-efficient way to keep large notes current instead of appending correction blocks. Matching is literal (not regex).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `note_id` | integer\|string | Yes | - | Note ID to edit |
+| `old_string` | string | Yes | - | Exact literal text to replace; make it unique |
+| `new_string` | string | Yes | - | Replacement text (may be empty to delete the span) |
+| `replace_all` | boolean | No | false | Replace every occurrence instead of requiring exactly one |
+
+Fails if `old_string` is not found, or matches more than once while `replace_all` is `false`. A result exceeding the 500 KB content limit is refused, not truncated.
 
 ### `note_delete`
 
@@ -623,6 +651,11 @@ Delete a note by ID.
 note_save(title="Deploy Checklist", content="## Steps\n- Build\n- Test\n- Push", tags="ops,deploy")
 note_search(tags="deploy")
 note_edit(note_id=5, append="\n- Verify health endpoint")
+
+# Surgically fix a stale line in a large note without loading it all:
+note_grep(note_id=42, pattern="ODR-Plattform")      # -> find the exact line
+note_edit_string(note_id=42, old_string="Verweis auf die EU-ODR-Plattform (...)", new_string="")
+note_show(note_id=42, start_line=40, end_line=55)    # -> verify just that section
 ```
 
 ---
@@ -692,17 +725,19 @@ article_research(topic="PostgreSQL", save_as_note=true)
 | 30 | `infra_delete_service` | Infra | Delete a service |
 | 31 | `note_save` | Notes | Save a note |
 | 32 | `note_search` | Notes | Search notes |
-| 33 | `note_show` | Notes | Show full note |
-| 34 | `note_edit` | Notes | Edit a note |
-| 35 | `note_delete` | Notes | Delete a note |
-| 36 | `now_add` | Now | Add item to sprint backlog |
-| 37 | `now_list` | Now | List items (returns JSON) |
-| 38 | `now_show` | Now | Show single item with link payload |
-| 39 | `now_move` | Now | Move item between buckets |
-| 40 | `now_edit` | Now | Rename an item in place (title-only) |
-| 41 | `now_done` | Now | Mark item done (24h holding) |
-| 42 | `now_remove` | Now | Hard-delete an item |
-| 43 | `now_reorder` | Now | Reorder items in a bucket |
-| 44 | `now_settings_get` | Now | Read WIP limits |
-| 45 | `now_settings_set` | Now | Update WIP limits |
-| 46 | `article_research` | Research | Research topic across CM |
+| 33 | `note_show` | Notes | Show full note or a line range |
+| 34 | `note_grep` | Notes | Search within a note (matches + context) |
+| 35 | `note_edit` | Notes | Edit a note (title/content/append/tags) |
+| 36 | `note_edit_string` | Notes | Replace an exact substring in a note |
+| 37 | `note_delete` | Notes | Delete a note |
+| 38 | `now_add` | Now | Add item to sprint backlog |
+| 39 | `now_list` | Now | List items (returns JSON) |
+| 40 | `now_show` | Now | Show single item with link payload |
+| 41 | `now_move` | Now | Move item between buckets |
+| 42 | `now_edit` | Now | Rename an item in place (title-only) |
+| 43 | `now_done` | Now | Mark item done (24h holding) |
+| 44 | `now_remove` | Now | Hard-delete an item |
+| 45 | `now_reorder` | Now | Reorder items in a bucket |
+| 46 | `now_settings_get` | Now | Read WIP limits |
+| 47 | `now_settings_set` | Now | Update WIP limits |
+| 48 | `article_research` | Research | Research topic across CM |

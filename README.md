@@ -13,7 +13,7 @@ Stores decisions, code snippets, infrastructure details, and TODOs - so your AI 
 ## What it does
 
 - **Cross-Project Search** - Full-text search + semantic vector search across all projects
-- **MCP Integration** - 44 tools available directly in Claude Code sessions
+- **MCP Integration** - 48 tools available directly in Claude Code sessions
 - **Notes** - Long-form reference documents with tags and full-text search
 - **Snippets** - Code snippet library with tags and type detection
 - **Infrastructure Tracking** - Structured SSH host & service management
@@ -231,7 +231,7 @@ cm pinned --json                     # JSON output
 
 ### MCP Server (Claude Code)
 
-Automatically configured by `bash setup.sh` or `cm setup-mcp`. Exposes 44 tools: `context_save`, `context_search`, `todo_add`, `infra_list_hosts`, `infra_add_host`, `note_save`, `now_add`, `now_list`, and more.
+Automatically configured by `bash setup.sh` or `cm setup-mcp`. Exposes 48 tools: `context_save`, `context_search`, `todo_add`, `infra_list_hosts`, `infra_add_host`, `note_save`, `now_add`, `now_list`, and more.
 
 See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full list.
 
@@ -281,7 +281,7 @@ src/
 ├── features/    # Modules (snippets, TODOs, notes, infra, AI instructions)
 └── cli/         # Argument parser + command handlers + setup wizard
 
-mcp_server/      # MCP integration (stdio, 44 tools)
+mcp_server/      # MCP integration (stdio, 48 tools)
 embedding_worker/ # ONNX-based vector embeddings (all-MiniLM-L6-v2)
 ```
 
@@ -299,7 +299,7 @@ Dependencies flow inward only.
 ## Documentation
 
 - [docs/USER_GUIDE.md](docs/USER_GUIDE.md) - Getting started guide
-- [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) - MCP tools reference (44 tools)
+- [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) - MCP tools reference (48 tools)
 - [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) - Complete CLI command reference
 - [CHANGELOG.md](CHANGELOG.md) - Version history
 
