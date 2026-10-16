@@ -15,6 +15,7 @@ V5.1.1: Schema reconciliation - fresh installs get the complete schema
 V5.1.2: Now titles - reject over-long titles instead of silently truncating
 V5.2.0: now_edit (rename Now items in place) + context_delete MCP tool
 V5.3.0: Surgical note editing (note_edit_string, note_grep, note_show ranges) + mcp SDK v2
+V5.3.1: Security update of the bundled PostgreSQL/pgvector image
 """
 
-__version__ = "5.3.0"
+__version__ = "5.3.1"

@@ -4,6 +4,20 @@ All notable changes to ContextWolf will be documented in this file.
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-10-16
+
+Security update. No code changes, no database migrations and no configuration
+changes. Updating is recommended for all installations.
+
+### Security
+- Updated the bundled PostgreSQL/pgvector image in `docker-compose.yml` to a
+  current release with the latest security fixes.
+
+### Upgrade notes
+- Pull the new image and recreate the database container:
+  `docker compose pull && docker compose up -d`. Your data stays in the
+  mounted data directory (`./data/postgres` by default).
+
 ## [5.3.0] - 2026-09-19
 
 ### Added
